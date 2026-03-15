@@ -61,12 +61,16 @@ resource "google_storage_bucket" "data" {
     enabled = true
   }
 
+  # Hot storage: Standard for 14 days, then Coldline (never deleted)
   lifecycle_rule {
     condition {
-      age = 180
+      age                   = 14
+      matches_prefix        = ["backups/"]
+      matches_storage_class = ["STANDARD"]
     }
     action {
-      type = "Delete"
+      type          = "SetStorageClass"
+      storage_class = "COLDLINE"
     }
   }
 

@@ -25,6 +25,7 @@ from .auth.admin_router import router as admin_router
 from .pipeline.router import router as pipeline_router
 from .graph_db.router import router as knowledge_router
 from .web_ui.router import router as web_router
+from .voice.router import router as voice_router
 
 logger = logging.getLogger("osteotwin.planning")
 
@@ -77,6 +78,7 @@ app.include_router(admin_router)
 app.include_router(pipeline_router)
 app.include_router(knowledge_router)
 app.include_router(web_router)
+app.include_router(voice_router)
 
 
 # ---------------------------------------------------------------------------

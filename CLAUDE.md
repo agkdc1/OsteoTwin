@@ -18,6 +18,11 @@
 .\system\services.ps1 status    # check status
 .\system\services.ps1 logs      # view log files
 .\system\services.ps1 restart   # restart after code changes
+
+# Daily backup (scheduled task)
+.\system\daily_backup.ps1 install   # daily 2 AM backup to GCS
+.\system\daily_backup.ps1 status    # check last run
+.\system\daily_backup.ps1 run       # manual trigger
 ```
 
 ### Option 2: Manual (development)
@@ -64,6 +69,8 @@ cd dashboard && npm install && cd ..
 ```bash
 # Backup (DB, cases, mesh cache → GCS)
 bash system/backup.sh [tag]
+# Daily automated: runs at 2 AM via Windows Task Scheduler
+# Storage tiering: 14 days hot (Standard), then Coldline (never deleted)
 
 # Restore
 bash system/restore.sh --list       # list available backups
@@ -107,6 +114,9 @@ bash system/fetch_secrets.sh [project_id]
 - `POST /api/v1/knowledge/corrections` — store surgeon correction in Neo4j
 - `GET /api/v1/knowledge/rules` — retrieve anatomical rules
 - `GET /api/v1/knowledge/status` — Neo4j connection status
+- `POST /api/v1/voice/query` — intraoperative voice query (text-in/text-out)
+- `POST /api/v1/voice/reset` — reset voice session
+- `GET /api/v1/voice/sessions` — list active voice sessions
 - `GET /stl-proxy/{path}` — serve STL files for Three.js viewer
 - `GET /`, `/viewer`, `/debate` — HTMX web UI pages
 
@@ -126,6 +136,8 @@ bash system/fetch_secrets.sh [project_id]
 - `GET /api/v1/implants/suggest` — smart implant sizing
 - `POST /api/v1/export/stl` — 3D print STL export
 - `GET /api/v1/export/stl/{case_id}` — list/download exported STLs
+- `GET /api/v1/soft-tissue/status` — SOFA engine status
+- `POST /api/v1/soft-tissue/simulate` — soft-tissue biomechanical simulation
 
 ## Testing
 ```bash
@@ -154,4 +166,6 @@ pytest tests/ -v
 - [x] Phase 3: STL export for 3D printing (color-coded fragments + plates, K-wires excluded)
 - [x] Phase 4: E2E integration test (8/8 passed), live Claude tool-use verified
 - [x] React Command Center dashboard (Vite + React + Tailwind v4 + Lucide)
-- [ ] Phase 5: SOFA soft-tissue (blocked: GPU quota pending, retry after 2026-03-17)
+- [x] Phase 5: SOFA soft-tissue scaffolding (spring-mass fallback active, full SOFA pending GPU quota, retry after 2026-03-17)
+- [x] Phase 6: Intraoperative Voice Assistant (consultative mode, text-in/text-out, session persistence)
+- [x] Daily backup scheduled task (2 AM → GCS)

@@ -108,7 +108,60 @@ terraform apply
 
 ---
 
-## Phase 3: Soft-Tissue Biomechanics & FEA (The Ultimate Goal)
+## Phase 5: Soft-Tissue Biomechanics — SOFA Integration
+
+**Status:** Scaffolding Complete — Spring-mass fallback active
+
+### What's Built
+- [x] `shared/soft_tissue_protocol.py` — Full Pydantic schema for tissue definitions, tension results, vascular proximity
+- [x] `simulation_server/app/soft_tissue/engine.py` — Dual-mode engine (SOFA FEA + spring-mass fallback)
+- [x] `simulation_server/app/soft_tissue/router.py` — API endpoints (`/api/v1/soft-tissue/simulate`, `/status`)
+- [x] Spring-mass model verified: correctly computes tension, strain, risk levels
+- [x] SOFA scene generator (auto-generates `.py` scenes for `runSofa` batch mode)
+- [ ] Install SOFA binaries + SofaPython3 (conda or binary — waiting for GPU quota)
+- [ ] Real FEA simulation with tetrahedral meshes
+
+### How It Works Now (Without SOFA)
+The spring-mass model treats each soft tissue as a spring connecting two attachment points on bone fragments. When fragments move, tissue tension is computed as `F = k * max(0, current_length - rest_length)`. This gives clinically useful feedback (tension thresholds, risk levels) without GPU.
+
+### How It Will Work (With SOFA)
+When SOFA is installed, the engine automatically detects `SofaPython3`, generates a SOFA scene with proper FEA solvers (EulerImplicit + CG), and runs it in subprocess batch mode. Results are parsed from output files.
+
+### Prerequisites for Full SOFA
+- GPU quota approved (retry after 2026-03-17)
+- Install: `conda install sofa-python3 -c sofa-framework -c conda-forge`
+- Or: Download SOFA v25.12+ binaries from sofa-framework.org
+
+---
+
+## Phase 6: Intraoperative Voice Assistant
+
+**Status:** Complete (text-in/text-out prototype)
+
+### Architecture
+```
+Surgeon speaks → [STT] → Text → VoiceAgentOrchestrator → Claude (tool-use) → Simulation Server → Clinical Response → [TTS] → Surgeon hears
+```
+
+### What's Built
+- [x] `planning_server/app/voice/prompts.py` — Consultative system prompt (non-prescriptive guardrails)
+- [x] `planning_server/app/voice/orchestrator.py` — Full orchestrator with tool-use loop (simulate_action, check_collision, check_soft_tissue)
+- [x] `planning_server/app/voice/router.py` — `POST /api/v1/voice/query` (text-in/text-out)
+- [x] Session persistence per case (conversation context maintained)
+- [x] Surgical plan injection into system prompt
+- [ ] STT integration (Whisper)
+- [ ] TTS integration (Google/OpenAI TTS)
+- [ ] Wake word detection ("Osteo, ...")
+
+### Consultative Guardrails
+The voice agent NEVER gives commands. It phrases everything as observations:
+- "The simulation indicates..." NOT "Do X now"
+- "Based on the plan, the K-wire entry point is at..." NOT "Insert the K-wire here"
+- Flags safety concerns as observations, not directives
+
+---
+
+## Phase 7: Soft-Tissue Biomechanics & FEA (The Ultimate Goal)
 
 **Status:** Not Started — Blocked by hardware upgrade
 

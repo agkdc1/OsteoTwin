@@ -68,10 +68,38 @@ ARCHIVE="/tmp/osteotwin-backup-${TAG}.tar.gz"
 tar -czf "${ARCHIVE}" -C /tmp "osteotwin-backup-${TAG}"
 echo "[+] Archive created: ${ARCHIVE}"
 
-# Upload to GCS
+# Upload to GCS (Standard storage — hot for 14 days, then auto-tiered)
 gsutil cp "${ARCHIVE}" "${BUCKET}/backups/osteotwin-backup-${TAG}.tar.gz"
 echo "[+] Uploaded to ${BUCKET}/backups/osteotwin-backup-${TAG}.tar.gz"
 
-# Cleanup
+# ---------------------------------------------------------------------------
+# Storage tiering: move backups older than 14 days to Coldline
+# This is handled by GCS lifecycle rules (see Terraform), but we also
+# run an explicit rewrite for any that the lifecycle hasn't caught yet.
+# ---------------------------------------------------------------------------
+echo "[*] Checking for backups to tier to Coldline..."
+HOT_CUTOFF=$(date -d "14 days ago" +%Y%m%d 2>/dev/null || date -v-14d +%Y%m%d 2>/dev/null || echo "")
+
+if [ -n "${HOT_CUTOFF}" ]; then
+    gsutil ls -l "${BUCKET}/backups/" 2>/dev/null | while read -r line; do
+        # Extract filename and check date
+        FNAME=$(echo "$line" | awk '{print $NF}')
+        if echo "$FNAME" | grep -qP 'osteotwin-backup-(\d{8})'; then
+            BACKUP_DATE=$(echo "$FNAME" | grep -oP '\d{8}' | head -1)
+            if [ -n "$BACKUP_DATE" ] && [ "$BACKUP_DATE" -lt "$HOT_CUTOFF" ] 2>/dev/null; then
+                CURRENT_CLASS=$(gsutil stat "$FNAME" 2>/dev/null | grep "Storage class" | awk '{print $3}')
+                if [ "$CURRENT_CLASS" = "STANDARD" ]; then
+                    echo "[*] Tiering to Coldline: $FNAME (date: $BACKUP_DATE)"
+                    gsutil rewrite -s COLDLINE "$FNAME" 2>/dev/null || true
+                fi
+            fi
+        fi
+    done
+    echo "[+] Storage tiering complete"
+else
+    echo "[!] Could not compute cutoff date — skipping tiering"
+fi
+
+# Cleanup local temp files
 rm -rf "${BACKUP_DIR}" "${ARCHIVE}"
 echo "=== Backup complete ==="
