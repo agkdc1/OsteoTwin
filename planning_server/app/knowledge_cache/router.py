@@ -18,6 +18,7 @@ from .downloader import (
     is_cached,
 )
 from .cache_manager import cache_manager
+from .heartbeat import get_all_heartbeats, stop_heartbeat as _stop_heartbeat
 
 logger = logging.getLogger("osteotwin.knowledge_cache.router")
 
@@ -94,6 +95,19 @@ async def restore_cache():
     """Restore knowledge cache from GCS."""
     count = restore_from_gcs()
     return {"restored": count, "status": "ok" if count > 0 else "failed"}
+
+
+@router.get("/heartbeats")
+async def list_heartbeats():
+    """List all active cache heartbeats."""
+    return {"heartbeats": get_all_heartbeats()}
+
+
+@router.post("/heartbeats/{session_id}/stop")
+async def stop_session_heartbeat(session_id: str):
+    """Stop the heartbeat for a specific session."""
+    _stop_heartbeat(session_id)
+    return {"stopped": True, "session_id": session_id}
 
 
 class AssembleCacheRequest(BaseModel):

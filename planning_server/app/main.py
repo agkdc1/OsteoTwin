@@ -45,6 +45,8 @@ async def lifespan(app: FastAPI):
     await graph_db.connect()
     yield
     # Shutdown
+    from .knowledge_cache.heartbeat import stop_all_heartbeats
+    stop_all_heartbeats()
     await graph_db.close()
     logger.info("Planning Server shut down.")
 

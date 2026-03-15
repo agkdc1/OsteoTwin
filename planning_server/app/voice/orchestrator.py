@@ -79,10 +79,12 @@ class VoiceAgentOrchestrator:
         self.conversation_history: list[dict] = []
         self._client = anthropic.AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY)
 
-        # Build cached knowledge block
+        # Build cached knowledge block and start heartbeat
         from ..knowledge_cache.cache_manager import cache_manager
+        from ..knowledge_cache.heartbeat import start_heartbeat
 
         self._cached_blocks = cache_manager.assemble_cached_block(ao_code=ao_code)
+        self._heartbeat = start_heartbeat(f"voice-{case_id}", self._cached_blocks)
 
     async def process_text_query(
         self,
@@ -97,6 +99,10 @@ class VoiceAgentOrchestrator:
             'simulation_results' (list), and 'processing_time_ms'.
         """
         t0 = time.time()
+
+        # Touch heartbeat — a real query resets the timer
+        from ..knowledge_cache.heartbeat import touch_heartbeat
+        touch_heartbeat(f"voice-{self.case_id}")
 
         # Add user message to conversation
         self.conversation_history.append({"role": "user", "content": text})
@@ -235,3 +241,5 @@ class VoiceAgentOrchestrator:
     def reset_conversation(self):
         """Clear conversation history (e.g., between surgical phases)."""
         self.conversation_history.clear()
+        from ..knowledge_cache.heartbeat import stop_heartbeat
+        stop_heartbeat(f"voice-{self.case_id}")

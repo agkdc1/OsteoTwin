@@ -68,6 +68,7 @@ async def run_surgical_query(
 
     # Assemble cached knowledge block
     from ..knowledge_cache.cache_manager import cache_manager
+    from ..knowledge_cache.heartbeat import start_heartbeat, touch_heartbeat
 
     cached_blocks = cache_manager.assemble_cached_block(ao_code=ao_code)
 
@@ -79,6 +80,10 @@ async def run_surgical_query(
         "type": "text",
         "text": SURGICAL_AGENT_SYSTEM_PROMPT + rules_context,
     })
+
+    # Start/touch cache heartbeat to keep cache alive during idle periods
+    start_heartbeat(f"plan-{case_id}", cached_blocks)
+    touch_heartbeat(f"plan-{case_id}")
 
     # Build conversation
     messages: list[dict] = [{"role": "user", "content": query}]
