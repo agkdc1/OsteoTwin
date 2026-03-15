@@ -66,12 +66,23 @@ SOFT_TISSUE_TOOL = {
 class VoiceAgentOrchestrator:
     """Stateful voice agent that maintains conversation context within a case."""
 
-    def __init__(self, case_id: str, surgical_plan: str | None = None):
+    def __init__(
+        self,
+        case_id: str,
+        surgical_plan: str | None = None,
+        ao_code: str | None = None,
+    ):
         self.case_id = case_id
         self.surgical_plan = surgical_plan
+        self.ao_code = ao_code
         self.system_prompt = build_voice_system_prompt(surgical_plan)
         self.conversation_history: list[dict] = []
         self._client = anthropic.AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY)
+
+        # Build cached knowledge block
+        from ..knowledge_cache.cache_manager import cache_manager
+
+        self._cached_blocks = cache_manager.assemble_cached_block(ao_code=ao_code)
 
     async def process_text_query(
         self,
@@ -96,11 +107,15 @@ class VoiceAgentOrchestrator:
 
         messages = list(self.conversation_history)
 
+        # Build system prompt with cached knowledge + voice prompt
+        system_blocks = list(self._cached_blocks)
+        system_blocks.append({"type": "text", "text": self.system_prompt})
+
         for round_num in range(max_tool_rounds):
             resp = await self._client.messages.create(
                 model=config.CLAUDE_MODEL_FAST,
                 max_tokens=512,  # Short responses for voice
-                system=self.system_prompt,
+                system=system_blocks,
                 messages=messages,
                 tools=tools,
             )

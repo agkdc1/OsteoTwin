@@ -42,6 +42,9 @@ dashboard/dist/
 # Sample data (generated, not committed)
 sample_data/
 
+# Knowledge cache (large reference texts, backed up to GCS, not git)
+planning_server/knowledge_data/
+
 # OS
 .DS_Store
 Thumbs.db

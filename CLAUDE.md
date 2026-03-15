@@ -117,6 +117,11 @@ bash system/fetch_secrets.sh [project_id]
 - `POST /api/v1/voice/query` — intraoperative voice query (text-in/text-out)
 - `POST /api/v1/voice/reset` — reset voice session
 - `GET /api/v1/voice/sessions` — list active voice sessions
+- `GET /api/v1/knowledge-cache/status` — cache stats and source availability
+- `POST /api/v1/knowledge-cache/download` — download reference texts (background)
+- `POST /api/v1/knowledge-cache/backup` — backup cache to GCS
+- `POST /api/v1/knowledge-cache/restore` — restore cache from GCS
+- `POST /api/v1/knowledge-cache/assemble` — preview assembled cache block
 - `GET /stl-proxy/{path}` — serve STL files for Three.js viewer
 - `GET /`, `/viewer`, `/debate` — HTMX web UI pages
 

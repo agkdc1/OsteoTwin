@@ -34,3 +34,7 @@ neo4j>=5.27.0
 
 # Medical data (shared dependency)
 pydicom>=3.0.0
+
+# Knowledge cache (reference text extraction)
+pymupdf>=1.25.0
+beautifulsoup4>=4.12.0

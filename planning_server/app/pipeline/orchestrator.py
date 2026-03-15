@@ -66,7 +66,19 @@ async def run_surgical_query(
             "You MUST respect these rules — they are surgeon-validated corrections.\n"
         )
 
-    system = SURGICAL_AGENT_SYSTEM_PROMPT + rules_context
+    # Assemble cached knowledge block
+    from ..knowledge_cache.cache_manager import cache_manager
+
+    cached_blocks = cache_manager.assemble_cached_block(ao_code=ao_code)
+
+    # Build system prompt as content blocks (for prompt caching)
+    system_blocks = list(cached_blocks)  # Already has cache_control on last block
+
+    # Append rules and surgical system prompt (not cached — changes per query)
+    system_blocks.append({
+        "type": "text",
+        "text": SURGICAL_AGENT_SYSTEM_PROMPT + rules_context,
+    })
 
     # Build conversation
     messages: list[dict] = [{"role": "user", "content": query}]
@@ -80,7 +92,7 @@ async def run_surgical_query(
         resp = await client.messages.create(
             model=config.CLAUDE_MODEL_FAST,
             max_tokens=4096,
-            system=system,
+            system=system_blocks,
             messages=messages,
             tools=tools,
         )
