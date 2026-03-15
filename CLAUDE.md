@@ -173,5 +173,8 @@ pytest tests/ -v
 - [x] React Command Center dashboard (Vite + React + Tailwind v4 + Lucide)
 - [x] Phase 5: SOFA soft-tissue scaffolding (spring-mass fallback active, full SOFA pending GPU quota, retry after 2026-03-17)
 - [x] Phase 6: Intraoperative Voice Assistant (consultative mode, text-in/text-out, session persistence)
-- [x] Knowledge Cache: 44 open access sources (AO Surgery Reference 25 regions, OpenStax, StatPearls, WFNS), prompt caching, GCS backup
+- [x] Knowledge Cache: 1.88M tokens (AO Surgery Reference 25 regions + CMF, OpenStax, StatPearls, WFNS), 2-track pipeline (Gemini Librarian → Claude Surgeon), heartbeat, GCS backup
+- [x] STT/TTS voice pipeline (Whisper local/API + Edge TTS/Google TTS/OpenAI TTS)
+- [x] React Dashboard: 3D Viewer (Three.js/R3F), Voice Console, live API wiring
+- [x] Neo4j Docker Compose ready (docker-compose.neo4j.yml)
 - [x] Daily backup scheduled task (2 AM → GCS)

@@ -1,10 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FolderOpen, Server, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, FolderOpen, Box, Volume2, Server, Settings, LogOut } from 'lucide-react';
 import { clearToken, getUsername } from '../lib/api';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Overview' },
   { to: '/cases', icon: FolderOpen, label: 'Active Cases' },
+  { to: '/viewer', icon: Box, label: '3D Viewer' },
+  { to: '/voice', icon: Volume2, label: 'Voice Console' },
   { to: '/infra', icon: Server, label: 'Infrastructure' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];

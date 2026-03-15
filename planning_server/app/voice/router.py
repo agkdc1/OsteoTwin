@@ -5,11 +5,13 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from ..auth.dependencies import get_current_user
 from .orchestrator import VoiceAgentOrchestrator
+from .audio import transcribe, synthesize, STTProvider, TTSProvider
 
 logger = logging.getLogger("osteotwin.voice.router")
 
@@ -100,6 +102,74 @@ async def reset_voice_session(case_id: str):
         _sessions[case_id].reset_conversation()
         return {"reset": True, "case_id": case_id}
     return {"reset": False, "case_id": case_id, "reason": "No active session"}
+
+
+@router.post("/speak")
+async def voice_speak(
+    audio: UploadFile = File(..., description="Audio file (WAV, MP3, WEBM)"),
+    case_id: str = Form(...),
+    surgical_plan: Optional[str] = Form(None),
+    ao_code: Optional[str] = Form(None),
+    language: str = Form("ko"),
+    stt_provider: str = Form("whisper_local"),
+    tts_provider: str = Form("edge"),
+):
+    """Full audio-in, audio-out voice pipeline.
+
+    1. STT: Transcribe uploaded audio to text
+    2. Orchestrator: Process query with simulation tools
+    3. TTS: Synthesize response to audio
+
+    Returns MP3 audio of the clinical response.
+    """
+    # Step 1: STT
+    audio_bytes = await audio.read()
+    stt_result = await transcribe(
+        audio_bytes,
+        provider=STTProvider(stt_provider),
+        language=language,
+    )
+    transcribed_text = stt_result["text"]
+
+    if not transcribed_text.strip():
+        return Response(
+            content=b"",
+            media_type="audio/mpeg",
+            headers={"X-Transcription": "", "X-Error": "Empty transcription"},
+        )
+
+    # Step 2: Process query
+    if case_id not in _sessions:
+        _sessions[case_id] = VoiceAgentOrchestrator(
+            case_id=case_id,
+            surgical_plan=surgical_plan,
+            ao_code=ao_code,
+        )
+
+    orchestrator = _sessions[case_id]
+    result = await orchestrator.process_text_query(transcribed_text)
+    response_text = result["response"]
+
+    # Step 3: TTS
+    tts_result = await synthesize(
+        response_text,
+        provider=TTSProvider(tts_provider),
+        language=language,
+    )
+
+    return Response(
+        content=tts_result["audio_bytes"],
+        media_type=tts_result["content_type"],
+        headers={
+            "X-Transcription": transcribed_text[:200],
+            "X-Response-Text": response_text[:200],
+            "X-STT-Provider": stt_result["provider"],
+            "X-TTS-Provider": tts_result["provider"],
+            "X-STT-Duration-Ms": str(stt_result["duration_ms"]),
+            "X-Processing-Duration-Ms": str(result.get("processing_time_ms", 0)),
+            "X-TTS-Duration-Ms": str(tts_result["duration_ms"]),
+        },
+    )
 
 
 @router.get("/sessions")

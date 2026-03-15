@@ -122,3 +122,48 @@ export async function listExports(caseId: string) {
   const resp = await simFetch(`/v1/export/stl/${caseId}`);
   return resp.json();
 }
+
+export async function downloadStl(caseId: string, filename: string) {
+  const resp = await simFetch(`/v1/export/stl/${caseId}/${filename}`);
+  if (!resp.ok) throw new Error('STL download failed');
+  return resp.blob();
+}
+
+// --- Soft Tissue ---
+export async function softTissueStatus() {
+  const resp = await simFetch('/v1/soft-tissue/status');
+  return resp.json();
+}
+
+// --- Voice ---
+export async function voiceQuery(text: string, caseId: string, plan?: string) {
+  const resp = await authFetch('/api/v1/voice/query', {
+    method: 'POST',
+    body: JSON.stringify({ text, case_id: caseId, surgical_plan: plan }),
+  });
+  return resp.json();
+}
+
+export async function voiceSessions() {
+  const resp = await authFetch('/api/v1/voice/sessions');
+  return resp.json();
+}
+
+// --- Knowledge Cache ---
+export async function knowledgeCacheStatus() {
+  const resp = await authFetch('/api/v1/knowledge-cache/status');
+  return resp.json();
+}
+
+export async function downloadKnowledge(maxPriority = 3) {
+  const resp = await authFetch('/api/v1/knowledge-cache/download', {
+    method: 'POST',
+    body: JSON.stringify({ max_priority: maxPriority }),
+  });
+  return resp.json();
+}
+
+export async function cacheHeartbeats() {
+  const resp = await authFetch('/api/v1/knowledge-cache/heartbeats');
+  return resp.json();
+}
