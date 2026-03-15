@@ -79,12 +79,14 @@ class VoiceAgentOrchestrator:
         self.conversation_history: list[dict] = []
         self._client = anthropic.AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY)
 
-        # Build cached knowledge block and start heartbeat
-        from ..knowledge_cache.cache_manager import cache_manager
-        from ..knowledge_cache.heartbeat import start_heartbeat
+        # 2-Track: Gemini Librarian extracts brief on session start,
+        # Claude uses the compact brief for all subsequent queries
+        self._brief_xml: str | None = None
+        self._system_blocks: list[dict] = []
 
-        self._cached_blocks = cache_manager.assemble_cached_block(ao_code=ao_code)
-        self._heartbeat = start_heartbeat(f"voice-{case_id}", self._cached_blocks)
+        # Heartbeat placeholder — started after first query extracts the brief
+        from ..knowledge_cache.heartbeat import start_heartbeat
+        self._heartbeat_started = False
 
     async def process_text_query(
         self,
@@ -100,6 +102,23 @@ class VoiceAgentOrchestrator:
         """
         t0 = time.time()
 
+        # On first query, extract surgical brief via Gemini Librarian
+        if not self._brief_xml:
+            from ..knowledge_cache.librarian import extract_surgical_brief, build_surgeon_system_with_brief
+            from ..knowledge_cache.heartbeat import start_heartbeat
+
+            librarian_result = await extract_surgical_brief(
+                query=text, ao_code=self.ao_code,
+                surgical_plan=self.surgical_plan,
+            )
+            self._brief_xml = librarian_result["brief_xml"]
+            self._system_blocks = build_surgeon_system_with_brief(self._brief_xml)
+            self._system_blocks.append({"type": "text", "text": self.system_prompt})
+
+            # Start heartbeat with the compact brief
+            start_heartbeat(f"voice-{self.case_id}", self._system_blocks[:1])
+            self._heartbeat_started = True
+
         # Touch heartbeat — a real query resets the timer
         from ..knowledge_cache.heartbeat import touch_heartbeat
         touch_heartbeat(f"voice-{self.case_id}")
@@ -113,15 +132,11 @@ class VoiceAgentOrchestrator:
 
         messages = list(self.conversation_history)
 
-        # Build system prompt with cached knowledge + voice prompt
-        system_blocks = list(self._cached_blocks)
-        system_blocks.append({"type": "text", "text": self.system_prompt})
-
         for round_num in range(max_tool_rounds):
             resp = await self._client.messages.create(
                 model=config.CLAUDE_MODEL_FAST,
                 max_tokens=512,  # Short responses for voice
-                system=system_blocks,
+                system=self._system_blocks,
                 messages=messages,
                 tools=tools,
             )

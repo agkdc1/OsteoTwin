@@ -66,14 +66,21 @@ async def run_surgical_query(
             "You MUST respect these rules — they are surgeon-validated corrections.\n"
         )
 
-    # Assemble cached knowledge block
-    from ..knowledge_cache.cache_manager import cache_manager
+    # ---------------------------------------------------------------
+    # 2-Track Pipeline: Gemini Librarian -> Claude Surgeon
+    # Track 1: Gemini extracts a surgical brief from the full KB
+    # Track 2: Claude reasons with the compact brief + simulation tools
+    # ---------------------------------------------------------------
+    from ..knowledge_cache.librarian import extract_surgical_brief, build_surgeon_system_with_brief
     from ..knowledge_cache.heartbeat import start_heartbeat, touch_heartbeat
 
-    cached_blocks = cache_manager.assemble_cached_block(ao_code=ao_code)
+    librarian_result = await extract_surgical_brief(
+        query=query, ao_code=ao_code,
+    )
+    brief_xml = librarian_result["brief_xml"]
 
-    # Build system prompt as content blocks (for prompt caching)
-    system_blocks = list(cached_blocks)  # Already has cache_control on last block
+    # Build Claude's system prompt with the extracted brief (cached)
+    system_blocks = build_surgeon_system_with_brief(brief_xml)
 
     # Append rules and surgical system prompt (not cached — changes per query)
     system_blocks.append({
@@ -82,7 +89,7 @@ async def run_surgical_query(
     })
 
     # Start/touch cache heartbeat to keep cache alive during idle periods
-    start_heartbeat(f"plan-{case_id}", cached_blocks)
+    start_heartbeat(f"plan-{case_id}", system_blocks[:1])
     touch_heartbeat(f"plan-{case_id}")
 
     # Build conversation
