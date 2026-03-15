@@ -1,16 +1,15 @@
-"""AO Surgery Reference Scraper — Playwright-based JS-rendered content extraction.
+"""AO Surgery Reference Scraper — Sitecore Layout API-based content extraction.
 
-The AO Surgery Reference (surgeryreference.aofoundation.org) is a Single Page
-Application that loads content via JavaScript. Standard HTTP requests only get
-the shell HTML. This scraper uses Playwright (headless Chromium) to render the
-pages and extract the full surgical technique content.
+The AO Surgery Reference (surgeryreference.aofoundation.org) is powered by
+Sitecore JSS. Instead of rendering the SPA with a headless browser, we query
+the Sitecore Layout Service API directly to get the full JSON content, then
+extract text from the structured data.
+
+This is faster, more reliable, and gets deeper content than Playwright.
 
 Usage:
     python -m planning_server.app.knowledge_cache.ao_scraper [--region all|spine|upper|lower]
     python -m planning_server.app.knowledge_cache.ao_scraper --backup-gcs
-
-The scraped content is saved to planning_server/knowledge_data/ and backed up
-to GCS. These files are git-ignored.
 """
 
 from __future__ import annotations
@@ -23,237 +22,248 @@ import time
 from pathlib import Path
 from typing import Optional
 
+import httpx
+
 logger = logging.getLogger("osteotwin.ao_scraper")
 
 # Local cache directory
 CACHE_DIR = Path(__file__).resolve().parent.parent.parent / "knowledge_data"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-# Base URL
+# Sitecore API config
 BASE_URL = "https://surgeryreference.aofoundation.org"
+SITECORE_API_KEY = "{10C266B4-B8DB-47D1-8F7C-15963F9BEC78}"
+LAYOUT_API = "/sitecore/api/layout/render/jss"
 
 # ---------------------------------------------------------------------------
-# Complete AO Surgery Reference URL map
+# AO Surgery Reference page map (top-level entry points)
 # ---------------------------------------------------------------------------
 
-AO_PAGES: dict[str, list[dict]] = {
+AO_ENTRY_PAGES: dict[str, list[dict]] = {
     "upper_extremity": [
-        {"id": "aosr_clavicle", "label": "Clavicle Fractures", "paths": [
-            "/orthopedic-trauma/adult-trauma/clavicle-fractures",
-            "/orthopedic-trauma/adult-trauma/clavicle-fractures/approach/all-approaches",
-            "/orthopedic-trauma/adult-trauma/clavicle-fractures/further-reading/all-further-reading",
-        ]},
-        {"id": "aosr_scapula", "label": "Scapula", "paths": [
-            "/orthopedic-trauma/adult-trauma/scapula",
-        ]},
-        {"id": "aosr_proximal_humerus", "label": "Proximal Humerus", "paths": [
-            "/orthopedic-trauma/adult-trauma/proximal-humerus",
-            "/orthopedic-trauma/adult-trauma/proximal-humerus/approach/all-approaches",
-        ]},
-        {"id": "aosr_humeral_shaft", "label": "Humeral Shaft", "paths": [
-            "/orthopedic-trauma/adult-trauma/humeral-shaft",
-        ]},
-        {"id": "aosr_distal_humerus", "label": "Distal Humerus", "paths": [
-            "/orthopedic-trauma/adult-trauma/distal-humerus",
-            "/orthopedic-trauma/adult-trauma/distal-humerus/approach/all-approaches",
-        ]},
-        {"id": "aosr_proximal_forearm", "label": "Proximal Forearm", "paths": [
-            "/orthopedic-trauma/adult-trauma/proximal-forearm",
-        ]},
-        {"id": "aosr_forearm_shaft", "label": "Forearm Shaft", "paths": [
-            "/orthopedic-trauma/adult-trauma/forearm-shaft",
-        ]},
-        {"id": "aosr_distal_forearm", "label": "Distal Forearm", "paths": [
-            "/orthopedic-trauma/adult-trauma/distal-forearm",
-            "/orthopedic-trauma/adult-trauma/distal-forearm/approach/all-approaches",
-            "/orthopedic-trauma/adult-trauma/distal-forearm/preparation/all-preparation",
-            "/orthopedic-trauma/adult-trauma/distal-forearm/further-reading/all-further-reading",
-        ]},
-        {"id": "aosr_hand", "label": "Hand (Carpals, Metacarpals, Phalanges)", "paths": [
-            "/orthopedic-trauma/adult-trauma/carpal-bones",
-            "/orthopedic-trauma/adult-trauma/metacarpals",
-            "/orthopedic-trauma/adult-trauma/hand-proximal-phalanges",
-            "/orthopedic-trauma/adult-trauma/thumb",
-        ]},
+        {"id": "aosr_clavicle", "label": "Clavicle Fractures", "path": "/orthopedic-trauma/adult-trauma/clavicle-fractures"},
+        {"id": "aosr_scapula", "label": "Scapula", "path": "/orthopedic-trauma/adult-trauma/scapula"},
+        {"id": "aosr_proximal_humerus", "label": "Proximal Humerus", "path": "/orthopedic-trauma/adult-trauma/proximal-humerus"},
+        {"id": "aosr_humeral_shaft", "label": "Humeral Shaft", "path": "/orthopedic-trauma/adult-trauma/humeral-shaft"},
+        {"id": "aosr_distal_humerus", "label": "Distal Humerus", "path": "/orthopedic-trauma/adult-trauma/distal-humerus"},
+        {"id": "aosr_proximal_forearm", "label": "Proximal Forearm", "path": "/orthopedic-trauma/adult-trauma/proximal-forearm"},
+        {"id": "aosr_forearm_shaft", "label": "Forearm Shaft", "path": "/orthopedic-trauma/adult-trauma/forearm-shaft"},
+        {"id": "aosr_distal_forearm", "label": "Distal Forearm", "path": "/orthopedic-trauma/adult-trauma/distal-forearm"},
+        {"id": "aosr_hand", "label": "Hand", "path": "/orthopedic-trauma/adult-trauma/carpal-bones"},
     ],
     "lower_extremity": [
-        {"id": "aosr_pelvic_ring", "label": "Pelvic Ring", "paths": [
-            "/orthopedic-trauma/adult-trauma/pelvic-ring",
-        ]},
-        {"id": "aosr_acetabulum", "label": "Acetabulum", "paths": [
-            "/orthopedic-trauma/adult-trauma/acetabulum",
-        ]},
-        {"id": "aosr_proximal_femur", "label": "Proximal Femur", "paths": [
-            "/orthopedic-trauma/adult-trauma/proximal-femur",
-            "/orthopedic-trauma/adult-trauma/proximal-femur/approach/all-approaches",
-        ]},
-        {"id": "aosr_femoral_shaft", "label": "Femoral Shaft", "paths": [
-            "/orthopedic-trauma/adult-trauma/femoral-shaft",
-        ]},
-        {"id": "aosr_distal_femur", "label": "Distal Femur", "paths": [
-            "/orthopedic-trauma/adult-trauma/distal-femur",
-        ]},
-        {"id": "aosr_patella", "label": "Patella", "paths": [
-            "/orthopedic-trauma/adult-trauma/patella",
-        ]},
-        {"id": "aosr_proximal_tibia", "label": "Proximal Tibia", "paths": [
-            "/orthopedic-trauma/adult-trauma/proximal-tibia",
-            "/orthopedic-trauma/adult-trauma/proximal-tibia/approach/all-approaches",
-        ]},
-        {"id": "aosr_tibial_shaft", "label": "Tibial Shaft", "paths": [
-            "/orthopedic-trauma/adult-trauma/tibial-shaft",
-        ]},
-        {"id": "aosr_distal_tibia_malleoli", "label": "Distal Tibia & Malleoli", "paths": [
-            "/orthopedic-trauma/adult-trauma/distal-tibia",
-            "/orthopedic-trauma/adult-trauma/malleoli",
-            "/orthopedic-trauma/adult-trauma/malleoli/approach/all-approaches",
-        ]},
-        {"id": "aosr_foot", "label": "Foot", "paths": [
-            "/orthopedic-trauma/adult-trauma/talus",
-            "/orthopedic-trauma/adult-trauma/calcaneous",
-            "/orthopedic-trauma/adult-trauma/midfoot",
-            "/orthopedic-trauma/adult-trauma/metatarsals",
-        ]},
+        {"id": "aosr_pelvic_ring", "label": "Pelvic Ring", "path": "/orthopedic-trauma/adult-trauma/pelvic-ring"},
+        {"id": "aosr_acetabulum", "label": "Acetabulum", "path": "/orthopedic-trauma/adult-trauma/acetabulum"},
+        {"id": "aosr_proximal_femur", "label": "Proximal Femur", "path": "/orthopedic-trauma/adult-trauma/proximal-femur"},
+        {"id": "aosr_femoral_shaft", "label": "Femoral Shaft", "path": "/orthopedic-trauma/adult-trauma/femoral-shaft"},
+        {"id": "aosr_distal_femur", "label": "Distal Femur", "path": "/orthopedic-trauma/adult-trauma/distal-femur"},
+        {"id": "aosr_patella", "label": "Patella", "path": "/orthopedic-trauma/adult-trauma/patella"},
+        {"id": "aosr_proximal_tibia", "label": "Proximal Tibia", "path": "/orthopedic-trauma/adult-trauma/proximal-tibia"},
+        {"id": "aosr_tibial_shaft", "label": "Tibial Shaft", "path": "/orthopedic-trauma/adult-trauma/tibial-shaft"},
+        {"id": "aosr_distal_tibia_malleoli", "label": "Distal Tibia & Malleoli", "path": "/orthopedic-trauma/adult-trauma/distal-tibia"},
+        {"id": "aosr_foot", "label": "Foot", "path": "/orthopedic-trauma/adult-trauma/talus"},
     ],
     "spine": [
-        {"id": "aosr_spine_cervical", "label": "Spine: Cervical", "paths": [
-            "/spine/trauma/occipitocervical",
-            "/spine/trauma/subaxial-cervical",
-        ]},
-        {"id": "aosr_spine_thoracolumbar", "label": "Spine: Thoracolumbar", "paths": [
-            "/spine/trauma/thoracolumbar",
-        ]},
-        {"id": "aosr_spine_sacrum", "label": "Spine: Sacropelvic", "paths": [
-            "/spine/trauma/sacrum",
-        ]},
-        {"id": "aosr_spine_degenerative", "label": "Spine: Degenerative", "paths": [
-            "/spine/degenerative",
-        ]},
-        {"id": "aosr_spine_deformities", "label": "Spine: Deformities", "paths": [
-            "/spine/deformities",
-        ]},
-        {"id": "aosr_spine_tumors", "label": "Spine: Tumors", "paths": [
-            "/spine/tumors",
-        ]},
+        {"id": "aosr_spine_cervical", "label": "Spine: Cervical", "path": "/spine/trauma/occipitocervical"},
+        {"id": "aosr_spine_thoracolumbar", "label": "Spine: Thoracolumbar", "path": "/spine/trauma/thoracolumbar"},
+        {"id": "aosr_spine_sacrum", "label": "Spine: Sacropelvic", "path": "/spine/trauma/sacrum"},
+        {"id": "aosr_spine_degenerative", "label": "Spine: Degenerative", "path": "/spine/degenerative"},
+        {"id": "aosr_spine_deformities", "label": "Spine: Deformities", "path": "/spine/deformities"},
+        {"id": "aosr_spine_tumors", "label": "Spine: Tumors", "path": "/spine/tumors"},
     ],
 }
 
+# Additional entry pages for hand sub-regions
+HAND_EXTRA_PATHS = [
+    "/orthopedic-trauma/adult-trauma/metacarpals",
+    "/orthopedic-trauma/adult-trauma/hand-proximal-phalanges",
+    "/orthopedic-trauma/adult-trauma/thumb",
+]
 
-async def scrape_ao_page(page, url: str) -> str:
-    """Navigate to a URL, wait for JS rendering, and extract text content.
+FOOT_EXTRA_PATHS = [
+    "/orthopedic-trauma/adult-trauma/calcaneous",
+    "/orthopedic-trauma/adult-trauma/midfoot",
+    "/orthopedic-trauma/adult-trauma/metatarsals",
+]
 
-    For AO Surgery Reference SPA pages, we:
-    1. Load the page and wait for network idle
-    2. Click all "Learn more" / expandable sections
-    3. Extract the full rendered text from the body
-    """
+MALLEOLI_EXTRA_PATHS = [
+    "/orthopedic-trauma/adult-trauma/malleoli",
+]
+
+SPINE_CERVICAL_EXTRA = [
+    "/spine/trauma/subaxial-cervical",
+]
+
+
+def _fetch_layout(client: httpx.Client, item_path: str) -> Optional[dict]:
+    """Fetch Sitecore layout JSON for a given item path."""
+    url = (
+        f"{BASE_URL}{LAYOUT_API}"
+        f"?item={item_path}&sc_lang=en&sc_apikey={SITECORE_API_KEY}&sc_site=aosr"
+    )
     try:
-        await page.goto(url, wait_until="networkidle", timeout=30000)
-        await asyncio.sleep(3)  # Wait for SPA rendering
-
-        # Try to expand all collapsible sections
-        try:
-            # Click "Open subtypes", "Learn more", accordion headers, etc.
-            expandables = await page.query_selector_all(
-                'button, [class*="expand"], [class*="toggle"], '
-                '[class*="accordion"], a[class*="more"], [class*="collaps"]'
-            )
-            for btn in expandables[:30]:  # Limit to avoid infinite loops
-                try:
-                    if await btn.is_visible():
-                        await btn.click()
-                        await asyncio.sleep(0.3)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-        await asyncio.sleep(2)  # Wait for expanded content to render
-
-        # Extract body text
-        content = await page.inner_text("body")
-        return content.strip()
-
+        r = client.get(url, timeout=15)
+        if r.status_code == 200 and "json" in r.headers.get("content-type", ""):
+            return r.json()
     except Exception as exc:
-        logger.warning("Failed to scrape %s: %s", url, exc)
-        return ""
+        logger.warning("Failed to fetch layout for %s: %s", item_path, exc)
+    return None
 
 
-async def scrape_region(
-    region: str,
-    headless: bool = True,
-) -> dict[str, int]:
-    """Scrape all AO Surgery Reference pages for a body region.
+def _extract_text(obj: object) -> list[str]:
+    """Recursively extract all text content from Sitecore JSON."""
+    texts = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k in ("value", "text", "description", "title", "heading", "body", "content") and isinstance(v, str):
+                clean = re.sub(r"<[^>]+>", " ", v)
+                clean = re.sub(r"&nbsp;", " ", clean)
+                clean = re.sub(r"&amp;", "&", clean)
+                clean = re.sub(r"\s+", " ", clean).strip()
+                if len(clean) > 10:
+                    texts.append(clean)
+            elif isinstance(v, (dict, list)):
+                texts.extend(_extract_text(v))
+    elif isinstance(obj, list):
+        for item in obj:
+            texts.extend(_extract_text(item))
+    return texts
 
-    Args:
-        region: "upper_extremity", "lower_extremity", "spine", or "all"
-        headless: Run browser in headless mode
 
-    Returns:
-        Dict of {source_id: token_count}
+def _find_internal_links(obj: object, base_path: str) -> set[str]:
+    """Find all internal AO Surgery Reference links in the JSON."""
+    links = set()
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k in ("href", "url", "path", "link") and isinstance(v, str):
+                if "/orthopedic-trauma/" in v or "/spine/" in v:
+                    # Normalize
+                    path = v.replace(BASE_URL, "").split("?")[0].split("#")[0]
+                    if path.startswith("/"):
+                        links.add(path)
+            elif isinstance(v, str) and base_path in v:
+                matches = re.findall(r"(/(?:orthopedic-trauma|spine)/[^\s\"'<>]+)", v)
+                for m in matches:
+                    links.add(m.split("?")[0].split("#")[0])
+            elif isinstance(v, (dict, list)):
+                links.update(_find_internal_links(v, base_path))
+    elif isinstance(obj, list):
+        for item in obj:
+            links.update(_find_internal_links(item, base_path))
+    return links
+
+
+async def scrape_region(region: str) -> dict[str, int]:
+    """Scrape all AO Surgery Reference pages for a body region via Sitecore API.
+
+    For each entry point:
+    1. Fetch the main page JSON
+    2. Discover all sub-page links (fracture types, approaches, treatments)
+    3. Fetch each sub-page and extract text
+    4. Combine into a single reference file
+
+    Returns {source_id: token_count}
     """
-    from playwright.async_api import async_playwright
-
     if region == "all":
-        regions = list(AO_PAGES.keys())
+        regions = list(AO_ENTRY_PAGES.keys())
     else:
         regions = [region]
 
     results = {}
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=headless)
-        context = await browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) OsteoTwin/1.0 (Research; Open Access)",
-        )
-        page = await context.new_page()
-
+    with httpx.Client(
+        headers={
+            "User-Agent": "Mozilla/5.0 OsteoTwin/1.0 (Research; Open Access)",
+            "Accept": "application/json",
+        },
+        follow_redirects=True,
+    ) as client:
         for reg in regions:
-            if reg not in AO_PAGES:
-                logger.warning("Unknown region: %s", reg)
-                continue
-
-            for entry in AO_PAGES[reg]:
+            for entry in AO_ENTRY_PAGES.get(reg, []):
                 source_id = entry["id"]
                 label = entry["label"]
-                paths = entry["paths"]
+                base_path = entry["path"]
 
                 logger.info("Scraping %s (%s)...", label, source_id)
-                all_text = []
+                all_texts = []
+                visited = set()
 
-                for path in paths:
-                    url = f"{BASE_URL}{path}"
-                    text = await scrape_ao_page(page, url)
-                    if text and len(text) > 100:
-                        all_text.append(f"--- {path} ---\n{text}")
-                    # Be polite
-                    await asyncio.sleep(1)
+                # Collect all entry paths for this source
+                entry_paths = [base_path]
+                if source_id == "aosr_hand":
+                    entry_paths.extend(HAND_EXTRA_PATHS)
+                elif source_id == "aosr_foot":
+                    entry_paths.extend(FOOT_EXTRA_PATHS)
+                elif source_id == "aosr_distal_tibia_malleoli":
+                    entry_paths.extend(MALLEOLI_EXTRA_PATHS)
+                elif source_id == "aosr_spine_cervical":
+                    entry_paths.extend(SPINE_CERVICAL_EXTRA)
 
-                if all_text:
+                # Phase 1: Fetch entry pages and discover sub-links
+                sub_links = set()
+                for path in entry_paths:
+                    if path in visited:
+                        continue
+                    visited.add(path)
+
+                    data = _fetch_layout(client, path)
+                    if not data:
+                        continue
+
+                    texts = _extract_text(data)
+                    if texts:
+                        all_texts.append(f"\n--- {path} ---\n" + "\n".join(texts))
+
+                    # Discover sub-pages
+                    links = _find_internal_links(data, base_path.rsplit("/", 1)[0])
+                    sub_links.update(links)
+
+                    time.sleep(0.5)
+
+                # Phase 2: Fetch discovered sub-pages
+                for sub_path in sorted(sub_links):
+                    if sub_path in visited:
+                        continue
+                    # Skip non-content paths
+                    if any(skip in sub_path for skip in [
+                        "/additional-credits", "/SearchResults",
+                        "login", "registration",
+                    ]):
+                        continue
+                    visited.add(sub_path)
+
+                    data = _fetch_layout(client, sub_path)
+                    if not data:
+                        continue
+
+                    texts = _extract_text(data)
+                    if texts:
+                        all_texts.append(f"\n--- {sub_path} ---\n" + "\n".join(texts))
+
+                    time.sleep(0.5)
+
+                # Save combined text
+                if all_texts:
                     full_text = (
                         f"=== AO Surgery Reference - {label} ===\n"
-                        f"Source: {BASE_URL}{paths[0]}\n"
+                        f"Source: {BASE_URL}{base_path}\n"
                         f"License: AO Foundation (free open access)\n"
-                        f"{'=' * 60}\n\n"
-                        + "\n\n".join(all_text)
+                        f"Pages scraped: {len(visited)}\n"
+                        f"{'=' * 60}\n"
+                        + "\n".join(all_texts)
                     )
 
-                    # Clean text
-                    full_text = _clean_ao_text(full_text)
-
-                    # Save
                     out_path = CACHE_DIR / f"{source_id}.txt"
                     out_path.write_text(full_text, encoding="utf-8")
 
-                    # Save metadata
                     meta = (
                         f"source_id: {source_id}\n"
                         f"name: AO Surgery Reference - {label}\n"
-                        f"url: {BASE_URL}{paths[0]}\n"
+                        f"url: {BASE_URL}{base_path}\n"
                         f"license: AO Foundation (free open access)\n"
                         f"downloaded: {time.strftime('%Y-%m-%dT%H:%M:%SZ')}\n"
-                        f"scraper: playwright\n"
-                        f"pages_scraped: {len(paths)}\n"
+                        f"scraper: sitecore-api\n"
+                        f"pages_scraped: {len(visited)}\n"
                         f"size_bytes: {len(full_text.encode('utf-8'))}\n"
                         f"estimated_tokens: {len(full_text) // 4}\n"
                     )
@@ -261,32 +271,15 @@ async def scrape_region(
 
                     tokens = len(full_text) // 4
                     results[source_id] = tokens
-                    logger.info("  %s: %d chars (~%d tokens)", source_id, len(full_text), tokens)
+                    logger.info(
+                        "  %s: %d pages, %d chars (~%d tokens)",
+                        source_id, len(visited), len(full_text), tokens,
+                    )
                 else:
                     results[source_id] = 0
                     logger.warning("  %s: no content extracted", source_id)
 
-        await browser.close()
-
     return results
-
-
-def _clean_ao_text(text: str) -> str:
-    """Clean extracted AO Surgery Reference text."""
-    # Remove cookie banners, nav items
-    text = re.sub(r"(Accept All|Reject All|Cookie|Privacy Policy).*?\n", "", text)
-    # Collapse whitespace
-    text = re.sub(r"\n{4,}", "\n\n\n", text)
-    text = re.sub(r" {3,}", " ", text)
-    # Remove very short lines (navigation artifacts)
-    lines = text.split("\n")
-    cleaned = []
-    for line in lines:
-        s = line.strip()
-        if len(s) < 3 and s not in ("", "-", "*", "|"):
-            continue
-        cleaned.append(line)
-    return "\n".join(cleaned)
 
 
 def backup_to_gcs() -> int:
@@ -311,17 +304,15 @@ async def main():
     parser.add_argument(
         "--region", default="all",
         choices=["all", "upper_extremity", "lower_extremity", "spine"],
-        help="Body region to scrape (default: all)",
     )
-    parser.add_argument("--no-headless", action="store_true", help="Show browser window")
-    parser.add_argument("--backup-gcs", action="store_true", help="Backup to GCS after scraping")
+    parser.add_argument("--backup-gcs", action="store_true")
     args = parser.parse_args()
 
-    print(f"Scraping AO Surgery Reference: {args.region}")
-    results = await scrape_region(args.region, headless=not args.no_headless)
+    print(f"Scraping AO Surgery Reference via Sitecore API: {args.region}")
+    results = await scrape_region(args.region)
 
     print(f"\n{'=' * 60}")
-    print(f"Results:")
+    print("Results:")
     total_tokens = 0
     for source_id, tokens in sorted(results.items()):
         status = f"{tokens:,} tokens" if tokens > 0 else "EMPTY"
