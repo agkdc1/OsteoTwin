@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}OsteoTwin — Dashboard{% endblock %}
+
+{% block content %}
+<div class="container" x-data="dashboard()">
+
+    <h1 style="margin: 1rem 0; color: #4fc3f7;">OsteoTwin Dashboard</h1>
+
+    <!-- System Status -->
+    <div class="grid-3" style="margin-bottom: 1.5rem;">
+        <div class="card">
+            <h2>Planning Server :8200</h2>
+            <div id="plan-status-box">
+                <span class="status-badge" :class="planOk ? 'status-ok' : 'status-err'"
+                    x-text="planOk ? 'RUNNING' : 'DOWN'"></span>
+            </div>
+        </div>
+        <div class="card">
+            <h2>Simulation Server :8300</h2>
+            <div id="sim-status-box">
+                <span class="status-badge" :class="simOk ? 'status-ok' : 'status-err'"
+                    x-text="simOk ? 'RUNNING' : 'DOWN'"></span>
+            </div>
+        </div>
+        <div class="card">
+            <h2>Knowledge Graph</h2>
+            <span class="status-badge" :class="kgOk ? 'status-ok' : 'status-warn'"
+                x-text="kgOk ? 'CONNECTED' : 'DISABLED'"></span>
+        </div>
+    </div>
+
+    <!-- Auth -->
+    <div class="card" x-show="!token">
+        <h2>Login</h2>
+        <form @submit.prevent="login">
+            <div class="grid-2" style="margin-bottom: 0.5rem;">
+                <input type="text" x-model="username" placeholder="Username" required>
+                <input type="password" x-model="password" placeholder="Password" required>
+            </div>
+            <button class="btn" type="submit">Login</button>
+            <span x-text="loginError" style="color: #ef5350; margin-left: 1rem; font-size: 0.85rem;"></span>
+        </form>
+    </div>
+
+    <!-- Logged in -->
+    <div x-show="token">
+        <div style="margin-bottom: 1rem; color: #9e9e9e; font-size: 0.85rem;">
+            Logged in as <strong x-text="currentUser" style="color: #4fc3f7;"></strong>
+            <button class="btn" style="padding: 0.2rem 0.6rem; font-size: 0.75rem; margin-left: 1rem;" @click="logout">Logout</button>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid-3" style="margin-bottom: 1.5rem;">
+            <a href="/viewer" class="card" style="text-decoration: none; text-align: center; cursor: pointer; transition: border-color 0.2s;" onmouseover="this.style.borderColor='#4fc3f7'" onmouseout="this.style.borderColor='#2a2a3a'">
+                <h2>3D Viewer</h2>
+                <p style="color: #9e9e9e; font-size: 0.85rem;">Load cases, place implants, check K-wire trajectories</p>
+            </a>
+            <a href="/debate" class="card" style="text-decoration: none; text-align: center; cursor: pointer; transition: border-color 0.2s;" onmouseover="this.style.borderColor='#ab47bc'" onmouseout="this.style.borderColor='#2a2a3a'">
+                <h2>Surgical Council</h2>
+                <p style="color: #9e9e9e; font-size: 0.85rem;">Claude vs Gemini multi-agent debate</p>
+            </a>
+            <div class="card" style="text-align: center;">
+                <h2>System</h2>
+                <p style="color: #9e9e9e; font-size: 0.85rem;">
+                    GPU: RTX 3060 8GB<br>
+                    RAM: 16 GB
+                </p>
+            </div>
+        </div>
+
+        <!-- Surgical Query -->
+        <div class="card">
+            <h2>Surgical Planning Query</h2>
+            <p style="color: #9e9e9e; margin-bottom: 0.75rem; font-size: 0.85rem;">
+                The AI uses the simulation engine for all physical queries. It never guesses physics.
+            </p>
+            <div class="grid-2" style="margin-bottom: 0.5rem;">
+                <input type="text" x-model="queryCaseId" placeholder="Case ID">
+                <input type="text" x-model="queryAoCode" placeholder="AO Code (e.g., 23-A2.1)">
+            </div>
+            <textarea x-model="query" rows="3" placeholder="e.g., Check if a 1.6mm K-wire from the radial styloid at 45 degrees will hit the volar plate" style="margin-bottom: 0.5rem;"></textarea>
+            <button class="btn" @click="submitQuery" :disabled="querying">
+                <span x-show="!querying">Run Query</span>
+                <span x-show="querying">Simulating...</span>
+            </button>
+            <div x-show="queryResult" style="margin-top: 1rem;">
+                <h2>AI Response</h2>
+                <div style="background: #1a1a2e; padding: 1rem; border-radius: 4px; font-size: 0.85rem; white-space: pre-wrap; line-height: 1.5;" x-text="queryResponse"></div>
+                <div x-show="queryToolCalls.length > 0" style="margin-top: 0.5rem;">
+                    <h2>Simulation Tool Calls</h2>
+                    <template x-for="tc in queryToolCalls" :key="tc.round">
+                        <div style="font-size: 0.8rem; padding: 0.3rem 0; border-bottom: 1px solid #2a2a3a;">
+                            <span class="status-badge status-warn" x-text="tc.tool"></span>
+                            <span style="color: #666;" x-text="'Round ' + tc.round"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function dashboard() {
+    return {
+        planOk: false,
+        simOk: false,
+        kgOk: false,
+        token: localStorage.getItem('osteotwin_token') || '',
+        currentUser: localStorage.getItem('osteotwin_user') || '',
+        username: '',
+        password: '',
+        loginError: '',
+        queryCaseId: 'synth_wrist_001',
+        queryAoCode: '',
+        query: '',
+        querying: false,
+        queryResult: null,
+        queryResponse: '',
+        queryToolCalls: [],
+
+        async init() {
+            // Check services
+            try { const r = await fetch('/health'); this.planOk = r.ok; } catch(e) {}
+            try { const r = await fetch('http://localhost:8300/health'); this.simOk = r.ok; } catch(e) {}
+            try {
+                const r = await fetch('/api/v1/knowledge/status');
+                const d = await r.json();
+                this.kgOk = d.connected;
+            } catch(e) {}
+        },
+
+        async login() {
+            this.loginError = '';
+            try {
+                const resp = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: this.username, password: this.password})
+                });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    this.loginError = err.detail || 'Login failed';
+                    return;
+                }
+                const data = await resp.json();
+                this.token = data.access_token;
+                this.currentUser = this.username;
+                localStorage.setItem('osteotwin_token', this.token);
+                localStorage.setItem('osteotwin_user', this.username);
+            } catch(e) {
+                this.loginError = 'Connection error';
+            }
+        },
+
+        logout() {
+            this.token = '';
+            this.currentUser = '';
+            localStorage.removeItem('osteotwin_token');
+            localStorage.removeItem('osteotwin_user');
+        },
+
+        async submitQuery() {
+            this.querying = true;
+            this.queryResult = null;
+            this.queryResponse = '';
+            this.queryToolCalls = [];
+            try {
+                const resp = await fetch('/api/v1/pipeline/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.token}`
+                    },
+                    body: JSON.stringify({
+                        query: this.query,
+                        case_id: this.queryCaseId || 'default',
+                        ao_code: this.queryAoCode || null,
+                    })
+                });
+                const data = await resp.json();
+                this.queryResult = data;
+                this.queryResponse = data.response || JSON.stringify(data, null, 2);
+                this.queryToolCalls = data.tool_calls || [];
+            } catch(e) {
+                this.queryResponse = 'Error: ' + e.message;
+            }
+            this.querying = false;
+        }
+    };
+}
+</script>
+{% endblock %}

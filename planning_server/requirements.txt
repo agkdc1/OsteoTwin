@@ -1,0 +1,36 @@
+# OsteoTwin Planning Server dependencies
+# FastAPI + ASGI
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-dotenv>=1.0.0
+
+# Data validation
+pydantic>=2.10.0
+
+# Database
+sqlalchemy[asyncio]>=2.0.0
+aiosqlite>=0.20.0
+
+# Authentication
+python-jose[cryptography]>=3.3.0
+bcrypt>=4.0.0
+
+# LLM orchestration
+anthropic>=0.52.0
+google-genai>=1.14.0
+langchain>=0.3.0
+langchain-anthropic>=0.3.0
+langchain-google-genai>=2.1.0
+
+# Web UI
+jinja2>=3.1.0
+python-multipart>=0.0.18
+
+# Inter-service communication
+httpx>=0.28.0
+
+# Graph database (Neo4j)
+neo4j>=5.27.0
+
+# Medical data (shared dependency)
+pydicom>=3.0.0

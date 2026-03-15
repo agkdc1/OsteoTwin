@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}OsteoTwin{% endblock %}</title>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0f;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        nav {
+            background: #12121a;
+            border-bottom: 1px solid #2a2a3a;
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+        nav .logo {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #4fc3f7;
+            text-decoration: none;
+        }
+        nav a {
+            color: #9e9e9e;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+        nav a:hover, nav a.active { color: #4fc3f7; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+        .card {
+            background: #12121a;
+            border: 1px solid #2a2a3a;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .card h2 { color: #4fc3f7; margin-bottom: 1rem; font-size: 1.1rem; }
+        .btn {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 0.5rem 1.2rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: #1565c0; }
+        .btn-danger { background: #c62828; }
+        .btn-danger:hover { background: #b71c1c; }
+        .btn-success { background: #2e7d32; }
+        .btn-success:hover { background: #1b5e20; }
+        input, textarea, select {
+            background: #1a1a2e;
+            border: 1px solid #2a2a3a;
+            color: #e0e0e0;
+            padding: 0.5rem;
+            border-radius: 4px;
+            width: 100%;
+            font-size: 0.9rem;
+        }
+        input:focus, textarea:focus { outline: none; border-color: #4fc3f7; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+        .status-badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-ok { background: #1b5e20; color: #a5d6a7; }
+        .status-warn { background: #e65100; color: #ffcc02; }
+        .status-err { background: #b71c1c; color: #ef9a9a; }
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: inline-block; }
+        #viewer-container {
+            width: 100%;
+            height: 600px;
+            background: #05050a;
+            border: 1px solid #2a2a3a;
+            border-radius: 8px;
+        }
+        .debate-round {
+            border-left: 3px solid #4fc3f7;
+            padding-left: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .agent-primary { border-left-color: #4fc3f7; }
+        .agent-secondary { border-left-color: #ab47bc; }
+        pre {
+            background: #1a1a2e;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 0.85rem;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav>
+        <a href="/" class="logo">OsteoTwin</a>
+        <a href="/">Dashboard</a>
+        <a href="/viewer">3D Viewer</a>
+        <a href="/debate">Debate</a>
+        <a href="/docs" target="_blank">API Docs</a>
+    </nav>
+
+    {% block content %}{% endblock %}
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

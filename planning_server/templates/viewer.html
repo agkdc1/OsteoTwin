@@ -1,0 +1,432 @@
+{% extends "base.html" %}
+{% block title %}OsteoTwin — 3D Viewer{% endblock %}
+
+{% block content %}
+<div class="container" x-data="viewer3d()">
+
+    <h1 style="margin: 1rem 0; color: #4fc3f7;">3D Fracture Viewer</h1>
+
+    <div style="display: grid; grid-template-columns: 320px 1fr; gap: 1rem;">
+        <!-- Left Panel: Controls -->
+        <div>
+            <!-- Case Loader -->
+            <div class="card">
+                <h2>Load Case</h2>
+                <input type="text" x-model="caseId" placeholder="Case ID (e.g., synth_wrist_001)" style="margin-bottom: 0.5rem;">
+                <button class="btn" @click="loadCase" :disabled="loading" style="width: 100%;">
+                    <span x-show="!loading">Load Fragments</span>
+                    <span x-show="loading">Loading...</span>
+                </button>
+            </div>
+
+            <!-- Loaded Meshes -->
+            <div class="card">
+                <h2>Scene <span style="color:#666; font-size:0.8rem;" x-text="'(' + meshes.length + ')'"></span></h2>
+                <template x-for="mesh in meshes" :key="mesh.id">
+                    <div style="padding: 0.4rem 0; border-bottom: 1px solid #2a2a3a; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span x-text="mesh.label" style="font-size: 0.85rem;"></span><br>
+                            <span class="status-badge" :class="mesh.type === 'bone' ? 'status-ok' : 'status-warn'" x-text="mesh.type" style="font-size: 0.7rem;"></span>
+                        </div>
+                        <div>
+                            <button class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;"
+                                @click="toggleMesh(mesh)" x-text="mesh.visible ? 'Hide' : 'Show'"></button>
+                        </div>
+                    </div>
+                </template>
+                <p x-show="meshes.length === 0" style="color: #666; font-size: 0.85rem;">No meshes loaded</p>
+            </div>
+
+            <!-- Implants -->
+            <div class="card">
+                <h2>Place Implant</h2>
+                <select x-model="selectedImplant" style="margin-bottom: 0.5rem;">
+                    <option value="">Select implant...</option>
+                    <optgroup label="Locking Plates">
+                        <option value="lcp_2.4_4hole">LCP 2.4mm 4-hole</option>
+                        <option value="lcp_2.4_6hole">LCP 2.4mm 6-hole</option>
+                        <option value="lcp_3.5_4hole">LCP 3.5mm 4-hole</option>
+                        <option value="lcp_3.5_6hole">LCP 3.5mm 6-hole</option>
+                        <option value="lcp_3.5_8hole">LCP 3.5mm 8-hole</option>
+                    </optgroup>
+                    <optgroup label="Screws">
+                        <option value="cortical_2.7x14">Cortical 2.7x14mm</option>
+                        <option value="cortical_3.5x20">Cortical 3.5x20mm</option>
+                        <option value="cortical_3.5x26">Cortical 3.5x26mm</option>
+                        <option value="cortical_3.5x30">Cortical 3.5x30mm</option>
+                    </optgroup>
+                    <optgroup label="K-wires">
+                        <option value="k_wire_1.0mm">K-wire 1.0mm</option>
+                        <option value="k_wire_1.6mm">K-wire 1.6mm</option>
+                        <option value="k_wire_2.0mm">K-wire 2.0mm</option>
+                    </optgroup>
+                </select>
+                <button class="btn" @click="placeImplant" :disabled="!selectedImplant" style="width: 100%;">Generate & Place</button>
+            </div>
+
+            <!-- K-wire Trajectory -->
+            <div class="card">
+                <h2>K-wire Trajectory Check</h2>
+                <div class="grid-2" style="margin-bottom: 0.3rem; gap: 0.3rem;">
+                    <input type="number" x-model.number="kwire.ox" placeholder="Org X" style="font-size:0.8rem;">
+                    <input type="number" x-model.number="kwire.oy" placeholder="Org Y" style="font-size:0.8rem;">
+                </div>
+                <div class="grid-2" style="margin-bottom: 0.3rem; gap: 0.3rem;">
+                    <input type="number" x-model.number="kwire.oz" placeholder="Org Z" style="font-size:0.8rem;">
+                    <input type="number" x-model.number="kwire.dx" placeholder="Dir X" style="font-size:0.8rem;">
+                </div>
+                <div class="grid-2" style="margin-bottom: 0.5rem; gap: 0.3rem;">
+                    <input type="number" x-model.number="kwire.dy" placeholder="Dir Y" style="font-size:0.8rem;">
+                    <input type="number" x-model.number="kwire.dz" placeholder="Dir Z" style="font-size:0.8rem;">
+                </div>
+                <button class="btn" @click="testKwire" style="width: 100%;">Check Collision</button>
+                <div x-show="kwireResult" style="margin-top: 0.5rem; font-size: 0.8rem; padding: 0.5rem; background: #1a1a2e; border-radius: 4px;">
+                    <div x-text="kwireResult.summary"></div>
+                    <div x-show="kwireResult.hits > 0" style="color: #ef5350;" x-text="'Hits: ' + kwireResult.hits"></div>
+                    <div x-show="kwireResult.hits === 0" style="color: #66bb6a;">Trajectory clear</div>
+                </div>
+            </div>
+
+            <!-- 3D Print Export -->
+            <div class="card">
+                <h2>3D Print Export</h2>
+                <button class="btn btn-success" @click="exportSTL" :disabled="meshes.length === 0" style="width: 100%; margin-bottom: 0.5rem;">
+                    Export for 3D Printing
+                </button>
+                <template x-for="file in exportedFiles" :key="file.filename">
+                    <div style="padding: 0.3rem 0; font-size: 0.8rem; border-bottom: 1px solid #2a2a3a;">
+                        <a :href="file.download_url" style="color: #4fc3f7;" x-text="file.filename"></a>
+                        <span style="color: #666;" x-text="file.size_kb + ' KB'"></span>
+                    </div>
+                </template>
+                <div x-show="printEstimate" style="margin-top: 0.5rem; font-size: 0.8rem; color: #9e9e9e;">
+                    <span x-text="'Material: ' + printEstimate.material_g + 'g PLA'"></span> |
+                    <span x-text="'~$' + printEstimate.cost_usd"></span>
+                </div>
+                <div x-show="kwireNote" style="margin-top: 0.3rem; font-size: 0.75rem; color: #ffab40;">
+                    <span x-text="kwireNote"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: 3D Viewport -->
+        <div>
+            <div id="viewer-container"></div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module">
+import * as THREE from 'https://unpkg.com/three@0.170.0/build/three.module.js';
+import { OrbitControls } from 'https://unpkg.com/three@0.170.0/examples/jsm/controls/OrbitControls.js';
+import { STLLoader } from 'https://unpkg.com/three@0.170.0/examples/jsm/loaders/STLLoader.js';
+
+const container = document.getElementById('viewer-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05050a);
+
+const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 10000);
+camera.position.set(80, 80, 80);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(container.clientWidth, container.clientHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+container.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+// Lighting
+scene.add(new THREE.AmbientLight(0x606060, 2));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+dirLight.position.set(100, 200, 100);
+scene.add(dirLight);
+const backLight = new THREE.DirectionalLight(0x4488aa, 0.5);
+backLight.position.set(-100, -50, -100);
+scene.add(backLight);
+
+// Grid & axes
+scene.add(new THREE.GridHelper(200, 20, 0x2a2a3a, 0x1a1a2e));
+scene.add(new THREE.AxesHelper(30));
+
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+});
+
+// Fragment colors
+const FRAG_COLORS = [0xe8d8c0, 0xc0b090, 0xd8c8a8, 0xb8a888, 0xc8b898];
+const HW_COLOR = 0x5080c8;
+
+window.threeScene = scene;
+window.threeCamera = camera;
+window.threeControls = controls;
+window.stlLoader = new STLLoader();
+window.THREE = THREE;
+window.FRAG_COLORS = FRAG_COLORS;
+window.HW_COLOR = HW_COLOR;
+</script>
+
+<script>
+function viewer3d() {
+    const SIM_URL = 'http://localhost:8300';
+    const PLAN_URL = '';
+
+    return {
+        caseId: 'synth_wrist_001',
+        loading: false,
+        meshes: [],
+        selectedImplant: '',
+        kwire: { ox: -50, oy: 0, oz: 0, dx: 1, dy: 0, dz: 0 },
+        kwireResult: null,
+        exportedFiles: [],
+        printEstimate: null,
+        kwireNote: '',
+        simKey: '',
+
+        async init() {
+            // Fetch SIM_API_KEY from .env via a simple endpoint
+            try {
+                const r = await fetch('/health');
+                if (r.ok) this.simKey = 'loaded';
+            } catch(e) {}
+        },
+
+        async getSimKey() {
+            // For now, read from localStorage or prompt
+            let key = localStorage.getItem('osteotwin_sim_key');
+            if (!key) {
+                key = prompt('Enter Simulation API Key (SIM_API_KEY from .env):');
+                if (key) localStorage.setItem('osteotwin_sim_key', key);
+            }
+            return key;
+        },
+
+        async simFetch(path, options = {}) {
+            const key = await this.getSimKey();
+            options.headers = { ...options.headers, 'X-API-Key': key };
+            return fetch(SIM_URL + path, options);
+        },
+
+        async loadCase() {
+            if (!this.caseId) return;
+            this.loading = true;
+
+            // Clear existing meshes from scene
+            this.meshes.forEach(m => {
+                if (m.threeObj) window.threeScene.remove(m.threeObj);
+            });
+            this.meshes = [];
+
+            try {
+                // Check if case already has meshes, or ingest DICOM
+                const listResp = await this.simFetch(`/api/v1/meshes?branch=main`);
+                const listData = await listResp.json();
+
+                // Load fragment STL files via proxy
+                const loader = window.stlLoader;
+                const scene = window.threeScene;
+
+                // Try loading fragments from mesh_cache
+                for (let i = 0; i < 10; i++) {
+                    const fragPath = `${this.caseId}/fragment_${String(i).padStart(2,'0')}.stl`;
+                    const proxyUrl = `/stl-proxy/${fragPath}`;
+
+                    try {
+                        const resp = await fetch(proxyUrl);
+                        if (!resp.ok) break;
+
+                        const buffer = await resp.arrayBuffer();
+                        const geometry = loader.parse(buffer);
+                        geometry.computeVertexNormals();
+
+                        const color = window.FRAG_COLORS[i % window.FRAG_COLORS.length];
+                        const material = new window.THREE.MeshPhongMaterial({
+                            color: color,
+                            specular: 0x333333,
+                            shininess: 30,
+                            transparent: true,
+                            opacity: 0.85,
+                        });
+                        const mesh = new window.THREE.Mesh(geometry, material);
+                        scene.add(mesh);
+
+                        this.meshes.push({
+                            id: `frag_${i}`,
+                            label: `Fragment ${i}`,
+                            type: 'bone',
+                            visible: true,
+                            threeObj: mesh,
+                            stlPath: fragPath,
+                        });
+                    } catch(e) {
+                        break;
+                    }
+                }
+
+                // Also try loading bone_full
+                try {
+                    const fullPath = `${this.caseId}/bone_full.stl`;
+                    const resp = await fetch(`/stl-proxy/${fullPath}`);
+                    if (resp.ok) {
+                        // Don't render bone_full if we have fragments, but track it
+                    }
+                } catch(e) {}
+
+                // Auto-focus camera on loaded geometry
+                if (this.meshes.length > 0) {
+                    const box = new window.THREE.Box3();
+                    this.meshes.forEach(m => box.expandByObject(m.threeObj));
+                    const center = box.getCenter(new window.THREE.Vector3());
+                    const size = box.getSize(new window.THREE.Vector3()).length();
+                    window.threeCamera.position.copy(center).add(new window.THREE.Vector3(size*0.8, size*0.6, size*0.8));
+                    window.threeControls.target.copy(center);
+                    window.threeControls.update();
+                }
+
+            } catch(e) {
+                alert('Failed to load case: ' + e.message);
+            }
+            this.loading = false;
+        },
+
+        toggleMesh(mesh) {
+            mesh.visible = !mesh.visible;
+            if (mesh.threeObj) mesh.threeObj.visible = mesh.visible;
+        },
+
+        async placeImplant() {
+            if (!this.selectedImplant) return;
+
+            try {
+                const resp = await this.simFetch(
+                    `/api/v1/implants/generate?implant_id=${this.selectedImplant}&branch=main`,
+                    { method: 'POST' }
+                );
+                const data = await resp.json();
+                if (!data.generated) { alert('Failed to generate implant'); return; }
+
+                // Load the generated STL
+                const stlPath = `implants/${this.selectedImplant}.stl`;
+                const proxyResp = await fetch(`/stl-proxy/${stlPath}`);
+                if (!proxyResp.ok) { alert('Could not load implant STL'); return; }
+
+                const buffer = await proxyResp.arrayBuffer();
+                const geometry = window.stlLoader.parse(buffer);
+                geometry.computeVertexNormals();
+
+                const material = new window.THREE.MeshPhongMaterial({
+                    color: window.HW_COLOR,
+                    specular: 0x666666,
+                    shininess: 80,
+                    transparent: true,
+                    opacity: 0.9,
+                });
+                const mesh = new window.THREE.Mesh(geometry, material);
+                window.threeScene.add(mesh);
+
+                this.meshes.push({
+                    id: this.selectedImplant,
+                    label: data.name,
+                    type: 'hardware',
+                    visible: true,
+                    threeObj: mesh,
+                    stlPath: stlPath,
+                });
+            } catch(e) {
+                alert('Error: ' + e.message);
+            }
+        },
+
+        async testKwire() {
+            try {
+                const resp = await this.simFetch('/api/v1/simulate/collision', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        case_id: this.caseId || 'viewer-test',
+                        branch: 'main',
+                        ray_origin: { x: this.kwire.ox, y: this.kwire.oy, z: this.kwire.oz },
+                        ray_direction: { x: this.kwire.dx, y: this.kwire.dy, z: this.kwire.dz },
+                    })
+                });
+                const data = await resp.json();
+                this.kwireResult = {
+                    summary: data.engine_summary,
+                    hits: data.total_hits,
+                };
+
+                // Draw ray in 3D
+                const scene = window.threeScene;
+                const origin = new window.THREE.Vector3(this.kwire.ox, this.kwire.oz, this.kwire.oy);
+                const dir = new window.THREE.Vector3(this.kwire.dx, this.kwire.dz, this.kwire.dy).normalize();
+                const color = data.total_hits > 0 ? 0xff4444 : 0x44ff44;
+                const arrow = new window.THREE.ArrowHelper(dir, origin, 200, color, 3, 2);
+                scene.add(arrow);
+
+                // Draw hit points
+                data.hits?.forEach(hit => {
+                    const sphere = new window.THREE.Mesh(
+                        new window.THREE.SphereGeometry(1.5, 8, 8),
+                        new window.THREE.MeshBasicMaterial({ color: 0xff0000 })
+                    );
+                    sphere.position.set(hit.hit_point.x, hit.hit_point.z, hit.hit_point.y);
+                    scene.add(sphere);
+                });
+            } catch(e) {
+                this.kwireResult = { summary: 'Error: ' + e.message, hits: -1 };
+            }
+        },
+
+        async exportSTL() {
+            if (!this.caseId) return;
+
+            const fragmentPaths = this.meshes
+                .filter(m => m.type === 'bone')
+                .map(m => `C:/Users/ahnch/Documents/OsteoTwin/simulation_server/mesh_cache/${m.stlPath}`);
+            const fragmentLabels = this.meshes
+                .filter(m => m.type === 'bone')
+                .map(m => m.label);
+            const hardwareIds = this.meshes
+                .filter(m => m.type === 'hardware')
+                .map(m => m.id);
+
+            try {
+                const resp = await this.simFetch('/api/v1/export/stl', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        case_id: this.caseId,
+                        fragment_stl_paths: fragmentPaths,
+                        fragment_labels: fragmentLabels,
+                        hardware_ids: hardwareIds,
+                        scale_factor: 1.0,
+                    })
+                });
+                const data = await resp.json();
+
+                // List exported files
+                const listResp = await this.simFetch(`/api/v1/export/stl/${this.caseId}`);
+                const listData = await listResp.json();
+                this.exportedFiles = listData.files || [];
+                this.printEstimate = data.print_estimate;
+                this.kwireNote = data.kwire_note || '';
+            } catch(e) {
+                alert('Export failed: ' + e.message);
+            }
+        },
+    };
+}
+</script>
+{% endblock %}

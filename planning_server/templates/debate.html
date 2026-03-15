@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}OsteoTwin — Surgical Debate{% endblock %}
+
+{% block content %}
+<div class="container" x-data="debateUI()">
+
+    <h1 style="margin: 1rem 0; color: #4fc3f7;">Surgical Council — Multi-Agent Debate</h1>
+
+    <!-- Start Debate -->
+    <div class="card">
+        <h2>Start New Debate</h2>
+        <p style="color: #9e9e9e; margin-bottom: 1rem; font-size: 0.85rem;">
+            Claude (Primary) and Gemini (Secondary) will independently analyze the fracture
+            and propose surgical plans. They then cross-validate each other's plans over multiple rounds.
+        </p>
+        <input type="text" x-model="caseId" placeholder="Case ID" style="margin-bottom: 0.5rem;">
+        <input type="text" x-model="aoCode" placeholder="AO Classification (e.g., 23-A2.1)" style="margin-bottom: 0.5rem;">
+        <textarea x-model="caseSummary" rows="4"
+            placeholder="Clinical description: 67-year-old female, distal radius fracture with dorsal angulation 25 degrees, intra-articular step-off 3mm..."
+            style="margin-bottom: 0.5rem;"></textarea>
+        <div class="grid-2" style="margin-bottom: 0.5rem;">
+            <select x-model.number="maxRounds">
+                <option value="2">2 Rounds</option>
+                <option value="3" selected>3 Rounds</option>
+                <option value="5">5 Rounds</option>
+            </select>
+            <button class="btn" @click="startDebate" :disabled="debating">
+                <span x-show="!debating">Start Debate</span>
+                <span x-show="debating">Debating...</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Debate Results -->
+    <div x-show="debate">
+
+        <!-- Status -->
+        <div class="card">
+            <h2>Debate Status</h2>
+            <span class="status-badge"
+                :class="debate?.status === 'consensus' ? 'status-ok' : debate?.status === 'dissent' ? 'status-warn' : 'status-err'"
+                x-text="debate?.status"></span>
+            <span style="margin-left: 1rem;" x-text="(debate?.rounds?.length || 0) + ' round(s) completed'"></span>
+        </div>
+
+        <!-- Rounds -->
+        <template x-for="round in (debate?.rounds || [])" :key="round.round_number">
+            <div class="card">
+                <h2 x-text="'Round ' + round.round_number"></h2>
+                <div class="grid-2">
+                    <!-- Primary (Claude) -->
+                    <div class="debate-round agent-primary">
+                        <h3 style="color: #4fc3f7; margin-bottom: 0.5rem;">Claude (Primary)</h3>
+                        <template x-for="plan in round.primary_response.proposed_plans" :key="plan.plan_id">
+                            <div style="margin-bottom: 1rem;">
+                                <strong x-text="plan.plan_label"></strong>
+                                <span class="status-badge"
+                                    :class="plan.estimated_risk === 'low' ? 'status-ok' : plan.estimated_risk === 'high' || plan.estimated_risk === 'critical' ? 'status-err' : 'status-warn'"
+                                    x-text="plan.estimated_risk"></span>
+                                <p style="font-size: 0.85rem; margin: 0.3rem 0;" x-text="plan.approach"></p>
+                                <ul style="font-size: 0.8rem; padding-left: 1.2rem;">
+                                    <template x-for="step in plan.reduction_sequence">
+                                        <li x-text="step"></li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </template>
+                        <div x-show="round.primary_response.critique_of_other" style="margin-top: 0.5rem; font-size: 0.85rem;">
+                            <strong>Critique:</strong> <span x-text="round.primary_response.critique_of_other"></span>
+                        </div>
+                    </div>
+
+                    <!-- Secondary (Gemini) -->
+                    <div class="debate-round agent-secondary">
+                        <h3 style="color: #ab47bc; margin-bottom: 0.5rem;">Gemini (Secondary)</h3>
+                        <template x-for="plan in round.secondary_response.proposed_plans" :key="plan.plan_id">
+                            <div style="margin-bottom: 1rem;">
+                                <strong x-text="plan.plan_label"></strong>
+                                <span class="status-badge"
+                                    :class="plan.estimated_risk === 'low' ? 'status-ok' : plan.estimated_risk === 'high' || plan.estimated_risk === 'critical' ? 'status-err' : 'status-warn'"
+                                    x-text="plan.estimated_risk"></span>
+                                <p style="font-size: 0.85rem; margin: 0.3rem 0;" x-text="plan.approach"></p>
+                                <ul style="font-size: 0.8rem; padding-left: 1.2rem;">
+                                    <template x-for="step in plan.reduction_sequence">
+                                        <li x-text="step"></li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </template>
+                        <div x-show="round.secondary_response.critique_of_other" style="margin-top: 0.5rem; font-size: 0.85rem;">
+                            <strong>Critique:</strong> <span x-text="round.secondary_response.critique_of_other"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Selected Plan -->
+        <div class="card" x-show="debate?.selected_plan">
+            <h2>Selected Plan</h2>
+            <div style="border: 2px solid #2e7d32; border-radius: 8px; padding: 1rem;">
+                <h3 x-text="debate?.selected_plan?.plan_label" style="color: #4fc3f7;"></h3>
+                <p x-text="debate?.selected_plan?.approach" style="margin: 0.5rem 0;"></p>
+                <strong>Hardware:</strong>
+                <ul style="padding-left: 1.2rem; font-size: 0.85rem;">
+                    <template x-for="hw in (debate?.selected_plan?.hardware_recommendation || [])">
+                        <li x-text="hw"></li>
+                    </template>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function debateUI() {
+    return {
+        caseId: '',
+        aoCode: '',
+        caseSummary: '',
+        maxRounds: 3,
+        debating: false,
+        debate: null,
+
+        async startDebate() {
+            const token = localStorage.getItem('osteotwin_token');
+            if (!token) {
+                alert('Please login first from the Dashboard');
+                return;
+            }
+            this.debating = true;
+            this.debate = null;
+            try {
+                const resp = await fetch('/api/v1/pipeline/debate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        case_summary: this.caseSummary,
+                        case_id: this.caseId || 'case-' + Date.now(),
+                        ao_code: this.aoCode || null,
+                        max_rounds: this.maxRounds
+                    })
+                });
+                this.debate = await resp.json();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+            this.debating = false;
+        }
+    };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,51 @@
+# Environment & secrets
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data & generated files
+planning_server/data/
+simulation_server/jobs/
+simulation_server/mesh_cache/
+simulation_server/dicom_cache/
+*.stl
+*.dcm
+*.nii
+*.nii.gz
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/*.tfstate*
+infra/terraform/.terraform.lock.hcl
+
+# Node (dashboard)
+dashboard/node_modules/
+dashboard/dist/
+
+# Sample data (generated, not committed)
+sample_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
