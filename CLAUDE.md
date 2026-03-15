@@ -173,4 +173,5 @@ pytest tests/ -v
 - [x] React Command Center dashboard (Vite + React + Tailwind v4 + Lucide)
 - [x] Phase 5: SOFA soft-tissue scaffolding (spring-mass fallback active, full SOFA pending GPU quota, retry after 2026-03-17)
 - [x] Phase 6: Intraoperative Voice Assistant (consultative mode, text-in/text-out, session persistence)
+- [x] Knowledge Cache: 44 open access sources (AO Surgery Reference 25 regions, OpenStax, StatPearls, WFNS), prompt caching, GCS backup
 - [x] Daily backup scheduled task (2 AM → GCS)

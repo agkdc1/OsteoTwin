@@ -159,6 +159,7 @@ cd dashboard && npm install && npm run dev  # Port 5173
 - [x] **React Dashboard:** Command Center (Vite + React + Tailwind v4 + Lucide)
 - [x] **Phase 5:** SOFA soft-tissue scaffolding (spring-mass fallback active, full SOFA pending GPU quota)
 - [x] **Phase 6:** Intraoperative Voice Assistant (consultative mode, text-in/text-out)
+- [x] **Knowledge Cache:** 44 open access sources with Anthropic prompt caching (AO Surgery Reference all 25 body regions + spine, OpenStax Anatomy, StatPearls, WFNS Spine, ~769K tokens total, 95% cost reduction)
 - [x] **Backup:** Daily 2 AM backup to GCS, 14-day hot + Coldline cold storage (never pruned)
 - [ ] **Phase 7:** Full SOFA FEA with GPU (blocked: GCP GPU quota, retry after 2026-03-17)
 
