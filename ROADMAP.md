@@ -87,7 +87,7 @@
 
 ### Full THUMS Mesh Conversion
 - [x] Export all 2,381 parts per subject as VTK unstructured grids (1,197 solid meshes, 133MB for AM50)
-- [ ] Decimate high-density soft-tissue meshes for real-time simulation (preserve anatomical boundaries)
+- [x] Decimate high-density meshes: LOD1 (2.1M faces, 90%), LOD2 (1.1M faces, 95% reduction) via quadric decimation
 - [x] THUMS mesh serving API (VTK-to-STL on-the-fly, region/mat_type filtering, batch scene loading)
 - [x] Three.js viewer: THUMS Anatomy Browser panel (browse by region, click to load, material color-coding)
 
