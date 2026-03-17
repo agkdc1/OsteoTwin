@@ -90,14 +90,22 @@
 - [x] Three.js viewer: THUMS Anatomy Browser panel (browse by region, click to load, material color-coding)
 
 ### Intraoperative C-arm Simulation
-- [ ] Virtual C-arm positioning (AP, lateral, oblique angles)
-- [ ] Simulated fluoroscopy from 3D mesh (DRR — Digitally Reconstructed Radiograph)
-- [ ] Compare virtual C-arm with actual OR images
+- [x] DRR engine: ray-cast Beer-Lambert attenuation through bone mesh volume
+- [x] AP, Lateral, and arbitrary oblique projections (angle around Z-axis)
+- [x] PNG output (bone=white on black, standard X-ray appearance)
+- [x] Multi-view batch: AP + Lateral + 30/45/60 deg obliques in one call
+- [x] API: POST /api/v1/carm/render (single view), POST /api/v1/carm/multiview
+- [ ] Compare virtual C-arm with actual OR images (future)
 
 ### Surgical Approach Mapping
-- [ ] Map named approaches (Henry, Thompson, Kocher-Langenbeck) onto 3D mesh
-- [ ] Highlight danger zones (nerves, vessels) along approach trajectory
-- [ ] Layer-by-layer dissection visualization (skin → fascia → muscle → bone)
+- [x] Approach Atlas: 5 named approaches with danger zones, layers, source citations
+  - Henry (volar distal radius), Thompson (dorsal proximal radius)
+  - Kocher-Langenbeck (posterior acetabulum), Deltopectoral (proximal humerus)
+  - Lateral Parapatellar (distal femur)
+- [x] Danger zone data: structure name, type, LPS position, safe distance, notes
+- [x] API: GET /api/v1/approaches, GET /{key}/danger-zones.stl (3D overlay)
+- [x] Layer-by-layer dissection descriptions (skin → bone for each approach)
+- [ ] Patient-specific danger zone adjustment from CT segmentation (future)
 
 ---
 

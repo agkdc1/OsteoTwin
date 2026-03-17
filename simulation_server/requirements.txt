@@ -30,3 +30,5 @@ python-dotenv>=1.0.0
 
 # FEA / THUMS data
 PyMuPDF>=1.25.0                  # PDF manual parsing
+meshio>=5.3.0                    # VTK mesh reading for THUMS
+Pillow>=11.0.0                   # DRR image rendering

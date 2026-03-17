@@ -203,6 +203,11 @@ Left/right sign flips are handled automatically in `/shared/kinematics.py`:
 - `GET /api/v1/export/stl/{case_id}` — list/download exported STLs
 - `GET /api/v1/soft-tissue/status` — SOFA engine status + THUMS data availability
 - `POST /api/v1/soft-tissue/simulate` — soft-tissue biomechanical simulation
+- `POST /api/v1/carm/render` — render simulated C-arm fluoroscopy (DRR) as PNG
+- `POST /api/v1/carm/multiview` — render standard C-arm views (AP, lateral, obliques)
+- `GET /api/v1/approaches` — list surgical approaches (filterable by region)
+- `GET /api/v1/approaches/{key}` — approach detail with danger zones and layers
+- `GET /api/v1/approaches/{key}/danger-zones.stl` — danger zone spheres as STL overlay
 - `GET /api/v1/soft-tissue/thums/{subject}` — query THUMS material database
 - `GET /api/v1/thums/subjects` — list available THUMS subjects
 - `GET /api/v1/thums/{subject}/parts` — list parts (filterable by region/mat_type)
@@ -254,3 +259,6 @@ pytest tests/test_e2e_pipeline.py -v
 - [x] Firestore Clinical Logging — SurgicalCaseLog schema (quantitative + qualitative), FirestoreFeedbackLogger (async, fire-and-forget), auto delta computation, post-op feedback, Terraform provisioning
 - [x] THUMS v7.1 Integration — LS-DYNA .k parser (2381 parts, 1975 materials, 840K nodes, 2.1M elements), thums_anatomical_map.json, VTK mesh export, SOFA material_configs.json, mass validation, 4 subjects (AF05/AF50/AM50/AM95), GCS backup, THUMSMaterialDB loader wired into soft-tissue engine
 - [x] Phase 9 CAD Pipeline fully wired — Gemini extraction, Claude SCAD generation, OpenSCAD 6-way render + Pillow stitch, Gemini QA validation (XML parsing), Claude auto-correction, OpenSCAD STL/3MF export
+- [x] C-arm Simulation — DRR engine (ray-cast Beer-Lambert attenuation), AP/lateral/oblique projections, PNG output
+- [x] Surgical Approach Atlas — 5 named approaches (Henry, Thompson, Kocher-Langenbeck, Deltopectoral, Lateral Knee) with danger zones, layers, source citations, STL danger zone overlay
+- [x] THUMS mesh decimation — LOD1 (50%), LOD2 (25%) via quadric decimation, meshio VTK reader

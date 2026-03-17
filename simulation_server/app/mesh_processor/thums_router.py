@@ -145,11 +145,34 @@ async def get_mesh_stl(subject: str, part_id: int):
         raise HTTPException(404, f"VTK mesh not found for part {part_id}")
 
     try:
+        import meshio
         import trimesh
-        mesh = trimesh.load(str(vtk_path))
-        if not isinstance(mesh, trimesh.Trimesh):
-            raise HTTPException(422, "Could not load as single mesh")
+        import numpy as np
 
+        m = meshio.read(str(vtk_path))
+        faces = []
+        for cell_block in m.cells:
+            if cell_block.type == "hexahedron":
+                for hex_nodes in cell_block.data:
+                    for face_ids in [(0,1,2,3),(4,5,6,7),(0,1,5,4),(2,3,7,6),(0,3,7,4),(1,2,6,5)]:
+                        f = hex_nodes[list(face_ids)]
+                        faces.append([f[0], f[1], f[2]])
+                        faces.append([f[0], f[2], f[3]])
+            elif cell_block.type == "tetra":
+                for tet in cell_block.data:
+                    for face_ids in [(0,1,2),(0,1,3),(0,2,3),(1,2,3)]:
+                        faces.append(tet[list(face_ids)].tolist())
+            elif cell_block.type in ("quad",):
+                for f in cell_block.data:
+                    faces.append([f[0], f[1], f[2]])
+                    faces.append([f[0], f[2], f[3]])
+            elif cell_block.type in ("triangle",):
+                faces.extend(f.tolist() for f in cell_block.data)
+
+        if not faces:
+            raise HTTPException(422, "No surface faces extracted from VTK")
+
+        mesh = trimesh.Trimesh(vertices=m.points, faces=np.array(faces), process=False)
         buf = io.BytesIO()
         mesh.export(buf, file_type="stl")
         return Response(
@@ -159,8 +182,10 @@ async def get_mesh_stl(subject: str, part_id: int):
                 "Content-Disposition": f'attachment; filename="thums_{subject}_{part_id}.stl"',
             },
         )
-    except ImportError:
-        raise HTTPException(500, "trimesh not installed")
+    except ImportError as exc:
+        raise HTTPException(500, f"Missing dependency: {exc}")
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(500, f"Mesh conversion failed: {exc}")
 
