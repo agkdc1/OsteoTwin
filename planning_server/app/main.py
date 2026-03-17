@@ -29,6 +29,8 @@ from .voice.router import router as voice_router
 from .knowledge_cache.router import router as knowledge_cache_router
 from .printer.router import router as printer_router
 from .pipeline.sync_router import router as sync_router
+from .services.firestore_logger import clinical_logger
+from .services.clinical_log_router import router as clinical_log_router
 
 logger = logging.getLogger("osteotwin.planning")
 
@@ -45,10 +47,12 @@ async def lifespan(app: FastAPI):
     )
     await init_db()
     await graph_db.connect()
+    await clinical_logger.connect()
     yield
     # Shutdown
     from .knowledge_cache.heartbeat import stop_all_heartbeats
     stop_all_heartbeats()
+    await clinical_logger.close()
     await graph_db.close()
     logger.info("Planning Server shut down.")
 
@@ -87,6 +91,7 @@ app.include_router(voice_router)
 app.include_router(knowledge_cache_router)
 app.include_router(printer_router)
 app.include_router(sync_router)
+app.include_router(clinical_log_router)
 
 
 # ---------------------------------------------------------------------------
@@ -106,6 +111,7 @@ async def info():
         "version": "0.1.0",
         "docs": "/docs",
         "neo4j": graph_db.available,
+        "firestore": clinical_logger.available,
     }
 
 

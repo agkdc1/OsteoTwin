@@ -157,6 +157,11 @@ Left/right sign flips are handled automatically in `/shared/kinematics.py`:
 - `POST /api/v1/admin/printer` — create/update printer profile
 - `DELETE /api/v1/admin/printer/{id}` — delete printer profile
 - `POST /api/v1/simulation/sync-ui-action` — receive manual 3D viewer drag → SurgicalAction
+- `GET /api/v1/clinical-logs/status` — Firestore logger availability
+- `POST /api/v1/clinical-logs` — create clinical case log entry
+- `GET /api/v1/clinical-logs/case/{case_id}` — retrieve logs for a case
+- `GET /api/v1/clinical-logs/surgeon/{surgeon_id}` — retrieve logs for a surgeon
+- `PATCH /api/v1/clinical-logs/{log_id}/post-op` — update with post-operative feedback
 - `GET /stl-proxy/{path}` — serve STL files for Three.js viewer
 - `GET /`, `/viewer`, `/debate` — HTMX web UI pages
 
@@ -197,6 +202,7 @@ pytest tests/ -v
 | Pub/Sub topic | `simulation-tasks-topic` | Async task queue |
 | Pub/Sub sub | `simulation-worker-sub` | Worker pull subscription |
 | Spot MIG | `osteotwin-sim-workers` | GPU workers (size=0) |
+| Firestore | `(default)` | Clinical case logging (Native Mode) |
 
 ## Phase Status
 - [x] Phase 0: Project scaffolding, schemas, server skeletons
@@ -217,3 +223,4 @@ pytest tests/ -v
 - [x] Phase 7: Physical Print Export — PrinterConfig/FilamentMapping schemas, printer admin API + React UI, 3MF export engine (multi-material with extruder metadata), named-STL ZIP fallback
 - [x] Phase 8: Bi-directional 3D UI Sync — coordinateMapper.ts (Three.js Y-up ↔ LPS Z-up), TransformControls on fragments, drag→SurgicalAction dispatch, sync-ui-action endpoint, Claude context injection
 - [x] Phase 9: Autonomous Catalog-to-CAD Pipeline — ManufacturerAlias (3-letter codes), ParametricImplantSpec, 6-strike QA loop (Gemini validates, Claude corrects), OpenSCAD generation, 6-way rendering, auto-export on approval
+- [x] Firestore Clinical Logging — SurgicalCaseLog schema (quantitative + qualitative), FirestoreFeedbackLogger (async, fire-and-forget), auto delta computation, post-op feedback, Terraform provisioning

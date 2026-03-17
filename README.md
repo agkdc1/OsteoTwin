@@ -169,6 +169,7 @@ cd dashboard && npm install && npm run dev  # Port 5173
 - [x] **Phase 7:** Physical Print Export — PrinterConfig admin UI, 3MF multi-material export with extruder metadata, named-STL ZIP fallback, color-to-extruder mapping
 - [x] **Phase 8:** Bi-directional 3D UI Sync — coordinateMapper (Three.js Y-up ↔ LPS Z-up), TransformControls on fragments, drag→SurgicalAction dispatch, sync-ui-action endpoint, Claude context injection
 - [x] **Phase 9:** Autonomous Catalog-to-CAD Pipeline — Manufacturer Alias System (3-letter codes), ParametricImplantSpec schema, 6-strike QA loop (Gemini validates → Claude corrects), OpenSCAD generation, 6-way orthographic rendering
+- [x] **Firestore Logging:** Clinical case logging (quantitative metrics + qualitative surgeon feedback), async Firestore writer, post-op deviation tracking, Terraform-provisioned
 - [ ] **Pending:** Full SOFA FEA with GPU (blocked: GCP GPU quota)
 
 ## Contributing

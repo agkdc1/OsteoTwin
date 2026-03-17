@@ -41,6 +41,7 @@ resource "google_project_service" "services" {
     "cloudbuild.googleapis.com",
     "pubsub.googleapis.com",
     "compute.googleapis.com",
+    "firestore.googleapis.com",
   ])
   project = google_project.osteotwin.project_id
   service = each.value
@@ -333,4 +334,53 @@ resource "google_secret_manager_secret" "neo4j_password" {
   }
 
   depends_on = [google_project_service.services]
+}
+
+# =============================================================================
+# Firestore: Clinical Case Logging (Native Mode)
+# =============================================================================
+
+resource "google_firestore_database" "clinical_logs" {
+  name        = "(default)"
+  project     = google_project.osteotwin.project_id
+  location_id = local.region
+  type        = "FIRESTORE_NATIVE"
+
+  deletion_policy = "DELETE"
+
+  depends_on = [google_project_service.services]
+}
+
+resource "google_firestore_index" "case_timestamp" {
+  project    = google_project.osteotwin.project_id
+  database   = google_firestore_database.clinical_logs.name
+  collection = "clinical_case_logs"
+
+  fields {
+    field_path = "case_id"
+    order      = "ASCENDING"
+  }
+  fields {
+    field_path = "timestamp"
+    order      = "DESCENDING"
+  }
+
+  depends_on = [google_firestore_database.clinical_logs]
+}
+
+resource "google_firestore_index" "surgeon_timestamp" {
+  project    = google_project.osteotwin.project_id
+  database   = google_firestore_database.clinical_logs.name
+  collection = "clinical_case_logs"
+
+  fields {
+    field_path = "surgeon_id"
+    order      = "ASCENDING"
+  }
+  fields {
+    field_path = "timestamp"
+    order      = "DESCENDING"
+  }
+
+  depends_on = [google_firestore_database.clinical_logs]
 }
