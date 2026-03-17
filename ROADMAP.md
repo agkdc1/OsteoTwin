@@ -1,224 +1,131 @@
-# OsteoTwin — Master Roadmap
+# OsteoTwin — Roadmap
 
-> From lightweight rigid-body collision detection on a homelab GPU to full soft-tissue biomechanical simulation on a high-end workstation.
-
-Each phase is gated by **hardware requirements** and **technical prerequisites**. Do not attempt a later phase until the hardware and dependencies of all prior phases are satisfied.
+> Patient-specific surgical rehearsal: from DICOM scan to 3D-printed model with AI-debated reduction plan.
 
 ---
 
-## Phase 1: Static Planning & Rigid Body Physics (Current)
+## Completed
 
-**Status:** In Progress
+### Core Platform
+- [x] Dual-server architecture (Planning :8200 + Simulation :8300)
+- [x] JWT auth with admin approval flow
+- [x] React Command Center (Vite + Tailwind v4 + Three.js/R3F)
+- [x] Windows services (NSSM auto-start), daily 2 AM GCS backup
+- [x] Terraform-managed GCP infra (Storage, Pub/Sub, Firestore, Spot VMs)
 
-### Hardware
-| Component | Spec |
-|-----------|------|
-| GPU | NVIDIA RTX 3060 (8 GB VRAM) |
-| RAM | 16 GB DDR4 |
-| CPU | Current desktop CPU |
-| Storage | Local SSD |
+### Simulation Engine
+- [x] Rigid-body collision detection (trimesh + FCL)
+- [x] K-wire trajectory ray-casting with cortex penetration flags
+- [x] Mesh-mesh boolean intersection (fragment-fragment, fragment-hardware)
+- [x] DICOM-to-mesh pipeline (VTK marching cubes + TotalSegmentator)
+- [x] Implant CAD library (20+ parametric items, smart sizing)
+- [x] Soft-tissue engine: spring-mass fallback active, SOFA FEA scaffolded
+- [x] THUMS v7.1 integration: 4 subjects parsed (2,381 parts, 840K nodes, 2.1M elements per subject), material properties extracted, SOFA material configs generated
 
-### Technology
-- **Backend:** FastAPI dual-server (Planning :8000, Simulation :8100)
-- **3D Physics:** `trimesh` — rigid-body collision detection (mesh-mesh intersection, ray casting)
-- **Medical Imaging:** `pydicom` for DICOM parsing, `vtk` for mesh extraction
-- **AI Orchestration:** LangChain + Anthropic SDK + Google GenAI — Multi-Agent JSON Tool Use
-- **Knowledge Graph:** Neo4j for anatomical rules and surgeon feedback loop
+### AI Pipeline
+- [x] Zero-Trust Grounding enforced across all prompts (source-only, no training data, consultative tone)
+- [x] 2-track pipeline: Gemini Librarian (1.88M-token knowledge cache) extracts surgical brief, Claude Surgeon reasons with simulation tools
+- [x] Multi-Agent Debate (Claude vs Gemini, sourced claims, structured rounds)
+- [x] Intraoperative Voice Assistant (Whisper STT + Edge/Google/OpenAI TTS, consultative mode)
+- [x] Neo4j Knowledge Graph (anatomical rules, surgeon corrections)
 
-### Features
-- [x] Project scaffolding, shared Pydantic schemas, server skeletons
-- [ ] Load static bone meshes (STL/OBJ) into the Simulation Server
-- [ ] **K-wire trajectory checking:** Given origin + direction, detect intersection with bone/plate meshes
-- [ ] **Basic fragment reduction:** Translate/rotate bone fragments, detect inter-fragment collisions
-- [ ] **Implant collision detection:** Check if placed hardware (K-wire, plate) collides with other hardware or anatomical boundaries
-- [ ] LLM Tool Use integration — Claude bound to `POST /api/v1/simulate/action` and `POST /api/v1/simulate/collision`
-- [ ] Neo4j anatomical rule engine — store/retrieve surgeon corrections
-- [ ] Multi-Agent Debate (Claude vs Gemini) with simulation validation
+### Spatial-Semantic Schema
+- [x] LPS coordinate standard (DICOM native) across all agents
+- [x] Clinical-term-to-math bridge (kinematics.py, side-aware L/R sign convention)
+- [x] SurgicalAction as universal inter-agent message
+- [x] Bi-directional 3D UI sync (Three.js drag -> LPS delta -> backend dispatch -> Claude context injection)
 
-### Constraints
-- No FEA or soft-tissue dynamics — RAM cannot handle it
-- All physics is rigid-body only (boolean intersection, distance queries)
-- Meshes are pre-processed static STLs, not dynamically deformed
+### 3D Print & Export
+- [x] Multi-material 3MF export with per-object extruder metadata
+- [x] Named-STL ZIP fallback with manifest
+- [x] Printer admin UI (color-to-extruder mapping matrix)
+- [x] K-wires excluded from prints (use real metal)
+- [x] 0.3-0.5mm global fillet for print aesthetics
 
----
+### Autonomous CAD Pipeline (Phase 9)
+- [x] Manufacturer Alias System (3-letter codes: SYN, STK, ZIM, etc.)
+- [x] Gemini dimension extraction from catalog descriptions
+- [x] Claude OpenSCAD generation (minkowski fillets, countersunk holes)
+- [x] 6-way orthographic rendering + Pillow grid stitch
+- [x] Gemini QA validation (10-point checklist, XML APPROVED/REJECTED)
+- [x] Claude auto-correction loop with 6-strike safety halt
+- [x] OpenSCAD CLI STL/3MF export
 
-## Phase 2: Automated Segmentation & Implants Library
+### Clinical Logging
+- [x] Firestore (Native Mode) for case lifecycle logging
+- [x] Quantitative metrics: AI plan vs surgeon plan delta, time-to-decision
+- [x] Qualitative metrics: intent mismatch logs, post-op deviation logs
+- [x] Async fire-and-forget writer (non-blocking)
 
-**Status:** Not Started
-
-### Prerequisites
-- Phase 1 fully operational
-- Sufficient storage for large DICOM datasets and trained segmentation models
-
-### Hardware
-| Component | Spec |
-|-----------|------|
-| GPU | RTX 3060 8 GB (sufficient for inference-only segmentation) |
-| RAM | 32 GB recommended (16 GB minimum with swap) |
-
-### Technology
-- **Segmentation:** `MONAI` or `TotalSegmentator` for automated CT → bone mesh extraction
-- **Implant CAD Library:** Parametric 3D models of standard orthopedic hardware
-  - Locking plates (LCP 3.5mm, 2.4mm — various hole counts)
-  - Cortical & cancellous screws (various diameters/lengths)
-  - K-wires (1.0mm, 1.2mm, 1.6mm, 2.0mm)
-  - Intramedullary nails
-  - External fixator pins
-
-### Features
-- [x] Automated DICOM-to-mesh pipeline (upload CT → segmented bone fragments in minutes)
-- [x] Searchable implant library with manufacturer-accurate 3D models
-- [x] Smart implant sizing — recommend plate/screw dimensions based on bone geometry
-- [ ] Pre-contoured plate fitting simulation
-
-### Goal
-Seamless pipeline from raw CT scans to fully manipulatable 3D environments with an accurate implant library, eliminating manual mesh preparation.
+### Testing
+- [x] 132 tests (unit + physics E2E + scenario), 0 failures
+- [x] Real trimesh collision, spring-mass tension, STL export exercised (~29s)
+- [x] 5 realistic surgical scenarios (distal radius, left humerus, print config, CAD QA, coordinate integrity)
 
 ---
 
-## Cloud Infrastructure (Provisioned, Dormant)
+## In Progress
 
-**Status:** Infrastructure provisioned via Terraform. **Zero compute cost** — all instances at `target_size = 0`.
+### GPU Compute Activation
+- [x] NVIDIA L4 quota confirmed (1x, asia-northeast1) — Terraform updated to g2-standard-8
+- [x] NVIDIA T4 quota confirmed (1x, asia-northeast1)
+- [ ] Scale MIG to 1 for first cloud simulation run
+- [ ] Request T4x4 + L4x2 quota increase (scheduled 2026-03-19 via `system/request_gpu_quota.sh`)
 
-### Why Provision Now?
-The Pub/Sub queue, checkpoint bucket, and Spot VM template are provisioned early so the architecture is cloud-ready from day one. When Phase 3 requires heavy FEA processing that exceeds our local RTX 3060, we simply set `target_size = 1` in Terraform and the cloud workers activate automatically.
-
-### Provisioned Resources (No Cost at Size 0)
-
-| Resource | Name | Purpose | Cost Now |
-|----------|------|---------|----------|
-| Pub/Sub Topic | `simulation-tasks-topic` | Async task queue | Free tier |
-| Pub/Sub Sub | `simulation-worker-sub` | Worker pull subscription | Free tier |
-| GCS Bucket | `osteotwin-*-checkpoints` | Simulation state checkpoints | Free (empty) |
-| Instance Template | `osteotwin-sim-worker-*` | Spot GPU VM (T4) template | $0 (template only) |
-| MIG | `osteotwin-sim-workers` | Managed instance group | **$0 (target_size=0)** |
-
-### Activation (Phase 3)
-```bash
-# When ready for cloud compute, just change target_size:
-cd infra/terraform
-# Edit main.tf: target_size = 1
-terraform apply
-```
-
-### Worker Architecture
-- **Checkpoint/Failover:** Worker saves intermediate state to GCS every N steps. On Spot preemption (SIGTERM), saves final checkpoint and exits cleanly. Next worker resumes from the checkpoint.
-- **ACK-on-Complete:** Pub/Sub messages are only ACK'd after 100% completion and result upload. Failed tasks are automatically retried via NACK + dead letter.
-- **Local Mode:** Same `worker.py` runs locally without Pub/Sub for Phase 1-2 development.
+### SOFA FEA with Real THUMS Data
+- [x] THUMS material properties parsed and mapped to SOFA force fields
+- [x] THUMSMaterialDB auto-loads into soft-tissue engine by body region
+- [ ] Install SOFA binaries on L4 GPU worker
+- [ ] Run first real FEA simulation with THUMS knee joint (ACL/PCL/MCL tension under valgus load)
+- [ ] Validate FEA results against THUMS manual mass table (2% tolerance)
 
 ---
 
-## Phase 5: Soft-Tissue Biomechanics — SOFA Integration
+## Next Up
 
-**Status:** Scaffolding Complete — Spring-mass fallback active
+### Full THUMS Mesh Conversion
+- [ ] Export all 2,381 parts per subject as VTK unstructured grids
+- [ ] Decimate high-density soft-tissue meshes for real-time simulation (preserve anatomical boundaries)
+- [ ] Load THUMS VTK meshes into Three.js viewer for visualization
 
-### What's Built
-- [x] `shared/soft_tissue_protocol.py` — Full Pydantic schema for tissue definitions, tension results, vascular proximity
-- [x] `simulation_server/app/soft_tissue/engine.py` — Dual-mode engine (SOFA FEA + spring-mass fallback)
-- [x] `simulation_server/app/soft_tissue/router.py` — API endpoints (`/api/v1/soft-tissue/simulate`, `/status`)
-- [x] Spring-mass model verified: correctly computes tension, strain, risk levels
-- [x] SOFA scene generator (auto-generates `.py` scenes for `runSofa` batch mode)
-- [ ] Install SOFA binaries + SofaPython3 (conda or binary — waiting for GPU quota)
-- [ ] Real FEA simulation with tetrahedral meshes
+### Intraoperative C-arm Simulation
+- [ ] Virtual C-arm positioning (AP, lateral, oblique angles)
+- [ ] Simulated fluoroscopy from 3D mesh (DRR — Digitally Reconstructed Radiograph)
+- [ ] Compare virtual C-arm with actual OR images
 
-### How It Works Now (Without SOFA)
-The spring-mass model treats each soft tissue as a spring connecting two attachment points on bone fragments. When fragments move, tissue tension is computed as `F = k * max(0, current_length - rest_length)`. This gives clinically useful feedback (tension thresholds, risk levels) without GPU.
-
-### How It Will Work (With SOFA)
-When SOFA is installed, the engine automatically detects `SofaPython3`, generates a SOFA scene with proper FEA solvers (EulerImplicit + CG), and runs it in subprocess batch mode. Results are parsed from output files.
-
-### Prerequisites for Full SOFA
-- GPU quota approved (retry after 2026-03-17)
-- Install: `conda install sofa-python3 -c sofa-framework -c conda-forge`
-- Or: Download SOFA v25.12+ binaries from sofa-framework.org
+### Surgical Approach Mapping
+- [ ] Map named approaches (Henry, Thompson, Kocher-Langenbeck) onto 3D mesh
+- [ ] Highlight danger zones (nerves, vessels) along approach trajectory
+- [ ] Layer-by-layer dissection visualization (skin → fascia → muscle → bone)
 
 ---
 
-## Phase 6: Intraoperative Voice Assistant
+## Future Vision
 
-**Status:** Complete (text-in/text-out prototype)
+### Clinical Feedback Loop
+- [ ] Post-op outcome correlation: did the simulation-predicted risks materialize?
+- [ ] Surgeon correction persistence in Neo4j → improves future plans
+- [ ] Multi-institution anonymized case aggregation
 
-### Architecture
-```
-Surgeon speaks → [STT] → Text → VoiceAgentOrchestrator → Claude (tool-use) → Simulation Server → Clinical Response → [TTS] → Surgeon hears
-```
-
-### What's Built
-- [x] `planning_server/app/voice/prompts.py` — Consultative system prompt (non-prescriptive guardrails)
-- [x] `planning_server/app/voice/orchestrator.py` — Full orchestrator with tool-use loop (simulate_action, check_collision, check_soft_tissue)
-- [x] `planning_server/app/voice/router.py` — `POST /api/v1/voice/query` (text-in/text-out)
-- [x] Session persistence per case (conversation context maintained)
-- [x] Surgical plan injection into system prompt
-- [ ] STT integration (Whisper)
-- [ ] TTS integration (Google/OpenAI TTS)
-- [ ] Wake word detection ("Osteo, ...")
-
-### Consultative Guardrails
-The voice agent NEVER gives commands. It phrases everything as observations:
-- "The simulation indicates..." NOT "Do X now"
-- "Based on the plan, the K-wire entry point is at..." NOT "Insert the K-wire here"
-- Flags safety concerns as observations, not directives
-
----
-
-## Phase 7: Soft-Tissue Biomechanics & FEA (The Ultimate Goal)
-
-**Status:** Not Started — Blocked by hardware upgrade
-
-### Prerequisites
-- Phase 2 fully operational
-- **Hardware upgrade completed** (see below)
-
-### Hardware Upgrade Required
-| Component | Minimum Spec | Recommended Spec |
-|-----------|-------------|-----------------|
-| CPU | Intel Core i9-14900K / AMD Ryzen 9 7950X | Threadripper PRO |
-| RAM | **64 GB DDR5** | **128 GB DDR5** |
-| GPU | NVIDIA RTX 4080 (16 GB) | **RTX 4090 (24 GB)** |
-| Storage | 2 TB NVMe SSD | 4 TB NVMe RAID |
-
-**Alternative:** On-demand cloud GPU via RunPod, Lambda Labs, or AWS (p4d.24xlarge) for burst FEA workloads while keeping the local homelab for development.
-
-### Technology
-- **Soft-Tissue Engine:** `SOFA Framework` (Simulation Open Framework Architecture)
-  - Position-Based Dynamics (PBD) for real-time deformation
-  - Finite Element Analysis (FEA) for accurate tissue stress/strain
-- **Muscle/Tendon Modeling:** Attach muscle origin/insertion points to bone meshes, calculate tension vectors during fragment manipulation
-- **Advanced Collision:** Continuous collision detection (CCD) for dynamic scenarios
-
-### Features
-- [ ] Real-time soft-tissue tension calculation during fragment reduction
-  - "Moving this distal fragment 5mm laterally increases supraspinatus tension to 45N (threshold: 30N)"
-- [ ] Dynamic fracture reduction feedback — see soft tissue deform as bones are repositioned
-- [ ] Muscle/tendon pull vector visualization on the 3D viewer
-- [ ] Periosteal stripping estimation based on fragment displacement
-- [ ] Vascular proximity warnings (e.g., brachial artery displacement during humeral fracture reduction)
-
-### Goal
-A fully biomechanical digital twin where the surgeon can feel (visually) how soft tissues respond to every manipulation, producing surgical plans that account for the dynamic reality of the OR.
-
----
-
-## Phase 4: Clinical Feedback Loop & Self-Correction (Vision)
-
-**Status:** Long-term research
-
-### Concept
-Feed actual recorded surgical videos back into the system to self-correct the AI's anatomical recognition and tension predictions. Compare pre-op simulation predictions with intra-op reality.
-
-### Features (Aspirational)
+### Video-Based Validation
 - [ ] Intra-operative video ingestion and landmark tracking
-- [ ] Post-op outcome correlation (did the simulation-predicted risk materialize?)
-- [ ] Continuous model refinement via surgeon feedback stored in the Knowledge Graph
-- [ ] Multi-institution federated learning for anonymized case data
+- [ ] Compare pre-op digital twin state with actual OR positions
+- [ ] Continuous model refinement from real surgical data
+
+### Advanced Biomechanics
+- [ ] Continuous collision detection (CCD) for dynamic reduction sequences
+- [ ] Muscle pull vector visualization during fragment manipulation
+- [ ] Patient-specific tissue properties from MRI elastography
+- [ ] Fracture propagation simulation (when does the bone break under load?)
 
 ---
 
-## Hardware Upgrade Decision Matrix
+## Hardware
 
-| Phase | RAM | GPU VRAM | Can Run on Current Homelab? |
-|-------|-----|----------|---------------------------|
-| Phase 1 (Rigid Body) | 16 GB | 8 GB | **Yes** |
-| Phase 2 (Segmentation) | 32 GB | 8 GB | Marginal (inference OK, training NO) |
-| Phase 3 (FEA/Soft Tissue) | 64-128 GB | 16-24 GB | **No — upgrade required** |
-| Phase 4 (Video/ML) | 128 GB | 24 GB+ | **No — cloud recommended** |
+| Environment | Spec | Status |
+|-------------|------|--------|
+| Local dev | RTX 3060 8GB, 16GB RAM, Windows 11 | Active |
+| Cloud (L4) | g2-standard-8 + NVIDIA L4 24GB, Spot | Quota confirmed, dormant |
+| Cloud (T4) | n1-standard-8 + NVIDIA T4 16GB, Spot | Quota confirmed, dormant |
+
+Scale up with: `gcloud compute instance-groups managed resize osteotwin-sim-workers --size=1 --zone=asia-northeast1-a`
