@@ -216,3 +216,4 @@ pytest tests/ -v
 - [x] Spatial-Semantic Schema: LPS coordinate standard, FragmentIdentity, SurgicalAction, kinematics bridge, orchestrator enforcement
 - [x] Phase 7: Physical Print Export — PrinterConfig/FilamentMapping schemas, printer admin API + React UI, 3MF export engine (multi-material with extruder metadata), named-STL ZIP fallback
 - [x] Phase 8: Bi-directional 3D UI Sync — coordinateMapper.ts (Three.js Y-up ↔ LPS Z-up), TransformControls on fragments, drag→SurgicalAction dispatch, sync-ui-action endpoint, Claude context injection
+- [x] Phase 9: Autonomous Catalog-to-CAD Pipeline — ManufacturerAlias (3-letter codes), ParametricImplantSpec, 6-strike QA loop (Gemini validates, Claude corrects), OpenSCAD generation, 6-way rendering, auto-export on approval
