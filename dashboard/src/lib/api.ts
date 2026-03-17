@@ -20,7 +20,7 @@ export function getUsername(): string {
   return localStorage.getItem('osteotwin_user') || '';
 }
 
-async function authFetch(path: string, options: RequestInit = {}) {
+export async function authFetch(path: string, options: RequestInit = {}) {
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

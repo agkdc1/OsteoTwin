@@ -29,6 +29,9 @@ import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent.parent.parent))
 from shared.simulation_protocol import SimActionRequest
 from shared.collision_protocol import CollisionCheckRequest
+from shared.schemas import SurgicalAction
+from shared.kinematics import surgical_action_to_sim_request
+from .sync_router import get_and_clear_ui_notes
 
 logger = logging.getLogger("osteotwin.orchestrator")
 
@@ -92,8 +95,15 @@ async def run_surgical_query(
     start_heartbeat(f"plan-{case_id}", system_blocks[:1])
     touch_heartbeat(f"plan-{case_id}")
 
+    # Inject pending UI action notes so Claude knows about manual drag moves
+    ui_notes = get_and_clear_ui_notes(case_id)
+    ui_context = ""
+    if ui_notes:
+        ui_context = "\n".join(ui_notes) + "\n\n"
+        logger.info("Injecting %d UI action notes into Claude context", len(ui_notes))
+
     # Build conversation
-    messages: list[dict] = [{"role": "user", "content": query}]
+    messages: list[dict] = [{"role": "user", "content": ui_context + query}]
     tools = [SIMULATE_ACTION_TOOL, CHECK_COLLISION_TOOL]
     tool_calls_log: list[dict] = []
     sim_results_log: list[dict] = []
@@ -139,7 +149,24 @@ async def run_surgical_query(
                     # Ensure we're on the hypothesis branch
                     tool_input.setdefault("branch", "LLM_Hypothesis")
                     tool_input.setdefault("case_id", case_id)
-                    req = SimActionRequest.model_validate(tool_input)
+
+                    # --- Semantic schema enforcement ---
+                    # If Claude provides a SurgicalAction-shaped payload
+                    # (has 'action_type' + 'target'), convert via kinematics
+                    # bridge.  Otherwise fall through to raw SimActionRequest.
+                    if "action_type" in tool_input and "target" in tool_input:
+                        action = SurgicalAction.model_validate(tool_input)
+                        action.case_id = action.case_id or case_id
+                        req = surgical_action_to_sim_request(action, case_id=case_id)
+                        logger.info(
+                            "SurgicalAction enforced: %s → %s (t=[%.1f,%.1f,%.1f]mm)",
+                            action.action_type.value,
+                            action.target.fragment_id,
+                            req.translation.x, req.translation.y, req.translation.z,
+                        )
+                    else:
+                        req = SimActionRequest.model_validate(tool_input)
+
                     result = await sim_client.simulate_action(req)
                     result_dict = result.model_dump(mode="json")
 

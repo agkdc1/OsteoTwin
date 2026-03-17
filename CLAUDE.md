@@ -86,6 +86,37 @@ bash system/dicom_cache.sh status                       # show cache usage
 bash system/fetch_secrets.sh [project_id]
 ```
 
+## Spatial-Semantic Interoperability Standard
+
+All inter-agent communication (Claude ↔ Gemini ↔ Simulation Server ↔ Dashboard) uses a common schema defined in `/shared/schemas.py` with math utilities in `/shared/kinematics.py`.
+
+### LPS Coordinate System (DICOM Standard)
+| Axis | Positive (+) | Negative (-) |
+|------|-------------|--------------|
+| X | Left | Right |
+| Y | Posterior | Anterior |
+| Z | Superior (proximal) | Inferior (distal) |
+
+### Key Models
+- **`FragmentIdentity`** — identifies a bone fragment by ID, color, and volume
+- **`SemanticMovement`** — a clinical movement (e.g., "distal 2mm", "valgus 3°") with side (L/R)
+- **`SurgicalAction`** — the universal message for any surgical move (clinical terms + resolved LPS math)
+- **`ValidationFeedback`** / **`CorrectionSuggestion`** — Gemini's structured validation response
+
+### Pipeline Flow
+1. Surgeon (voice/text) → Claude parses intent → `SurgicalAction` with `movements[]`
+2. `kinematics.resolve_movements()` auto-converts clinical terms to LPS vectors (side-aware sign flip)
+3. `kinematics.surgical_action_to_sim_request()` bridges `SurgicalAction` → `SimActionRequest`
+4. Orchestrator dispatches to Simulation Server; deterministic results returned
+5. For visual validation: Claude passes `SurgicalAction` JSON to Gemini with rendered image
+6. Gemini returns `CorrectionSuggestion` using exact `fragment_id` + LPS vectors
+
+### Side-Aware Sign Convention
+Left/right sign flips are handled automatically in `/shared/kinematics.py`:
+- Right side: medial = +X, lateral = -X
+- Left side: medial = -X, lateral = +X (mirrored)
+- Same mirroring applies to varus/valgus and internal/external rotation
+
 ## Code Style
 - Python 3.11+, Pydantic v2, async/await throughout
 - `from __future__ import annotations` in every module
@@ -122,6 +153,10 @@ bash system/fetch_secrets.sh [project_id]
 - `POST /api/v1/knowledge-cache/backup` — backup cache to GCS
 - `POST /api/v1/knowledge-cache/restore` — restore cache from GCS
 - `POST /api/v1/knowledge-cache/assemble` — preview assembled cache block
+- `GET /api/v1/admin/printer` — list printer profiles
+- `POST /api/v1/admin/printer` — create/update printer profile
+- `DELETE /api/v1/admin/printer/{id}` — delete printer profile
+- `POST /api/v1/simulation/sync-ui-action` — receive manual 3D viewer drag → SurgicalAction
 - `GET /stl-proxy/{path}` — serve STL files for Three.js viewer
 - `GET /`, `/viewer`, `/debate` — HTMX web UI pages
 
@@ -178,3 +213,6 @@ pytest tests/ -v
 - [x] React Dashboard: 3D Viewer (Three.js/R3F), Voice Console, live API wiring
 - [x] Neo4j Docker Compose ready (docker-compose.neo4j.yml)
 - [x] Daily backup scheduled task (2 AM → GCS)
+- [x] Spatial-Semantic Schema: LPS coordinate standard, FragmentIdentity, SurgicalAction, kinematics bridge, orchestrator enforcement
+- [x] Phase 7: Physical Print Export — PrinterConfig/FilamentMapping schemas, printer admin API + React UI, 3MF export engine (multi-material with extruder metadata), named-STL ZIP fallback
+- [x] Phase 8: Bi-directional 3D UI Sync — coordinateMapper.ts (Three.js Y-up ↔ LPS Z-up), TransformControls on fragments, drag→SurgicalAction dispatch, sync-ui-action endpoint, Claude context injection

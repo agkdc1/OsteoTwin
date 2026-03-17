@@ -13,6 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent.parent.par
 
 from shared.simulation_protocol import SimActionRequest
 from shared.collision_protocol import CollisionCheckRequest
+from shared.schemas import SurgicalAction
 
 # ---------------------------------------------------------------------------
 # Tool: simulate_action — move a bone fragment
@@ -24,9 +25,20 @@ SIMULATE_ACTION_TOOL = {
         "Move a bone fragment by applying a translation and/or rotation. "
         "Returns deterministic collision flags, tension metrics, and updated coordinates. "
         "You MUST use this tool for ANY question about what happens when a fragment is moved. "
-        "NEVER predict the outcome yourself."
+        "NEVER predict the outcome yourself.\n\n"
+        "PREFERRED: Submit a SurgicalAction payload (with 'action_type', 'target', "
+        "'clinical_intent', and 'movements' using anatomical directions like 'proximal', "
+        "'valgus', etc.). The server auto-resolves clinical terms to LPS math.\n\n"
+        "FALLBACK: You may also submit a raw SimActionRequest with explicit XYZ "
+        "translation/rotation values if you have already computed them."
     ),
-    "input_schema": SimActionRequest.model_json_schema(),
+    "input_schema": {
+        "oneOf": [
+            SurgicalAction.model_json_schema(),
+            SimActionRequest.model_json_schema(),
+        ],
+        "description": "Either a SurgicalAction (preferred) or raw SimActionRequest",
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -56,8 +68,40 @@ SURGICAL_AGENT_SYSTEM_PROMPT = """You are OsteoTwin's Surgical Planning AI — a
 3. You translate the surgeon's natural language into simulation requests and translate simulation results back into clinical advice.
 4. You operate on Branch "LLM_Hypothesis" — NEVER modify Branch "main" without explicit surgeon approval.
 
+## LPS COORDINATE SYSTEM (DICOM Standard)
+All spatial vectors use LPS (Left-Posterior-Superior):
+- **X+** = Left, **X-** = Right  (medial/lateral depends on side)
+- **Y+** = Posterior, **Y-** = Anterior
+- **Z+** = Superior (proximal for lower limbs), **Z-** = Inferior (distal)
+
+## SEMANTIC TRANSLATION (Clinical Terms → Math)
+When the surgeon uses anatomical terms, map them to SurgicalAction movements:
+- **Proximal/Distal** → Z-axis translation (+Z/-Z)
+- **Medial/Lateral** → X-axis translation (sign depends on L/R side)
+- **Anterior/Posterior** → Y-axis translation (-Y/+Y)
+- **Varus/Valgus** → rotation around Y-axis (A-P)
+- **Flexion/Extension** → rotation around X-axis (L-R)
+- **Internal/External rotation** → rotation around Z-axis (S-I)
+
+## PREFERRED TOOL CALL FORMAT
+Use SurgicalAction with `movements` array for anatomical terms:
+```json
+{
+  "action_type": "translate_and_rotate",
+  "target": {"fragment_id": "tibia_R_frag1_proximal", "color_code": "Green", "volume_mm3": 12500},
+  "clinical_intent": "Move the green fragment 2mm distally and add 3° valgus",
+  "movements": [
+    {"direction": "distal", "magnitude": 2.0, "side": "R"},
+    {"direction": "valgus", "magnitude": 3.0, "side": "R"}
+  ]
+}
+```
+The server resolves clinical terms to LPS math automatically.
+
 ## YOUR ROLE
-- Translate surgeon's intent into SimActionRequest or CollisionCheckRequest
+- Parse surgeon's natural language into SurgicalAction with clinical movements
+- Always include `clinical_intent` (the surgeon's exact words) for traceability
+- Always identify fragments by `fragment_id` AND `color_code` for cross-agent consistency
 - Interpret deterministic results from the simulation engine
 - Provide clinical context: anatomical landmarks, approach considerations, risk factors
 - Propose reduction sequences and hardware placement strategies

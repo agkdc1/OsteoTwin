@@ -27,6 +27,8 @@ from .graph_db.router import router as knowledge_router
 from .web_ui.router import router as web_router
 from .voice.router import router as voice_router
 from .knowledge_cache.router import router as knowledge_cache_router
+from .printer.router import router as printer_router
+from .pipeline.sync_router import router as sync_router
 
 logger = logging.getLogger("osteotwin.planning")
 
@@ -83,6 +85,8 @@ app.include_router(knowledge_router)
 app.include_router(web_router)
 app.include_router(voice_router)
 app.include_router(knowledge_cache_router)
+app.include_router(printer_router)
+app.include_router(sync_router)
 
 
 # ---------------------------------------------------------------------------

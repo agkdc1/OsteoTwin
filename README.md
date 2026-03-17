@@ -84,7 +84,8 @@ A hands-free consultative voice agent that operates in the OR. The surgeon asks 
 | Segmentation | TotalSegmentator (automated CT bone extraction) |
 | Knowledge Graph | Neo4j (anatomical rules, surgeon corrections) |
 | Medical Imaging | pydicom, VTK marching cubes |
-| Voice | Whisper (STT, planned), Google/OpenAI TTS (planned) |
+| Voice | Whisper (STT), Edge/Google/OpenAI TTS |
+| 3D Print | 3MF multi-material export, named-STL ZIP fallback |
 | Infrastructure | GCP (Secret Manager, Cloud Storage, Pub/Sub, Spot VMs) |
 | IaC | Terraform |
 | Services | NSSM (Windows auto-start), Task Scheduler (daily backup) |
@@ -111,9 +112,12 @@ OsteoTwin/
 |   +-- worker.py            # Pub/Sub worker (checkpoint/failover on Spot VMs)
 +-- dashboard/               # React Command Center (:5173)
 |   +-- src/
-|       +-- components/      # Overview, Cases, Infrastructure, Settings
+|       +-- lib/             # API client, coordinateMapper (Three.js <-> LPS)
+|       +-- components/      # Sidebar, StatusCard
+|       +-- pages/           # Overview, Cases, Viewer, Voice, PrinterAdmin, Settings
 +-- shared/                  # Pydantic schemas (single source of truth)
-|   +-- schemas/             # FractureCase, ReductionSimulation, AgentDebate
+|   +-- schemas/             # FractureCase, ReductionSimulation, AgentDebate, SpatialSemantic
+|   +-- kinematics.py            # Clinical terms <-> LPS math translation
 |   +-- simulation_protocol.py   # SimActionRequest / SimActionResponse
 |   +-- collision_protocol.py    # CollisionCheckRequest / CollisionCheckResponse
 |   +-- soft_tissue_protocol.py  # SoftTissueSimRequest / SoftTissueSimResponse
@@ -161,7 +165,10 @@ cd dashboard && npm install && npm run dev  # Port 5173
 - [x] **Phase 6:** Intraoperative Voice Assistant (consultative mode, text-in/text-out)
 - [x] **Knowledge Cache:** 44 open access sources with Anthropic prompt caching (AO Surgery Reference all 25 body regions + spine, OpenStax Anatomy, StatPearls, WFNS Spine, ~769K tokens total, 95% cost reduction)
 - [x] **Backup:** Daily 2 AM backup to GCS, 14-day hot + Coldline cold storage (never pruned)
-- [ ] **Phase 7:** Full SOFA FEA with GPU (blocked: GCP GPU quota, retry after 2026-03-17)
+- [x] **Spatial-Semantic Schema:** LPS coordinate standard, FragmentIdentity, SurgicalAction, kinematics bridge (clinical terms ↔ LPS math), side-aware sign convention
+- [x] **Phase 7:** Physical Print Export — PrinterConfig admin UI, 3MF multi-material export with extruder metadata, named-STL ZIP fallback, color-to-extruder mapping
+- [x] **Phase 8:** Bi-directional 3D UI Sync — coordinateMapper (Three.js Y-up ↔ LPS Z-up), TransformControls on fragments, drag→SurgicalAction dispatch, sync-ui-action endpoint, Claude context injection
+- [ ] **Pending:** Full SOFA FEA with GPU (blocked: GCP GPU quota)
 
 ## Contributing
 
