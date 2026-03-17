@@ -45,6 +45,10 @@ sample_data/
 # Knowledge cache (large reference texts, backed up to GCS, not git)
 planning_server/knowledge_data/
 
+# THUMS FEA data (1GB+, backed up to GCS, not git)
+fea/thums/
+fea/thums_output/
+
 # OS
 .DS_Store
 Thumbs.db

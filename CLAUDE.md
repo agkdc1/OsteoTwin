@@ -244,3 +244,4 @@ pytest tests/ -v
 - [x] Phase 8: Bi-directional 3D UI Sync — coordinateMapper.ts (Three.js Y-up ↔ LPS Z-up), TransformControls on fragments, drag→SurgicalAction dispatch, sync-ui-action endpoint, Claude context injection
 - [x] Phase 9: Autonomous Catalog-to-CAD Pipeline — ManufacturerAlias (3-letter codes), ParametricImplantSpec, 6-strike QA loop (Gemini validates, Claude corrects), OpenSCAD generation, 6-way rendering, auto-export on approval
 - [x] Firestore Clinical Logging — SurgicalCaseLog schema (quantitative + qualitative), FirestoreFeedbackLogger (async, fire-and-forget), auto delta computation, post-op feedback, Terraform provisioning
+- [x] THUMS v7.1 Integration — LS-DYNA .k parser (2381 parts, 1975 materials, 840K nodes, 2.1M elements), thums_anatomical_map.json, VTK mesh export, SOFA material_configs.json, mass validation, 4 subjects (AF05/AF50/AM50/AM95), GCS backup
