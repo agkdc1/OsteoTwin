@@ -1,179 +1,132 @@
-AI-Driven Orthopedic Reduction & Surgical Planning Simulator
+# OsteoTwin
 
-"What if I could completely clear the fog in my mind before stepping into the operating room?"
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![GCP: Powered](https://img.shields.io/badge/GCP-Cloud_Native-blue?logo=google-cloud)
+![AI: Multi-Agent](https://img.shields.io/badge/AI-Claude_%26_Gemini-orange)
+![Field: Orthopaedics](https://img.shields.io/badge/Field-Orthopaedic_Surgery-red)
 
-OsteoTwin is an open-source pre-operative planning and simulation framework born from the cognitive overload and inherent uncertainties faced by surgeons during complex fracture reductions. By bridging biomechanical 3D simulation with a Multi-Agent LLM architecture, OsteoTwin analyzes patient-specific anatomy to formulate, debate, and refine the optimal surgical reduction scenario.
+### The Digital Twin Your Surgeon Wishes Existed the Night Before Surgery
 
-## Why We Built This
+> *"What if I could shatter every bone in the simulation a hundred times, so that when I hold the real scalpel, my hands already know the way?"*
 
-Even with 3D-reconstructed CT scans, the actual reduction of a complex fracture often relies heavily on the surgeon's "spatial imagination." Unless you are a highly seasoned veteran, plans can easily fall apart in the OR due to several critical variables:
+---
 
-**Dynamic Soft Tissue Tension:** Traditional navigation systems fail to account for the pulling forces of muscles and tendons that shift when bone fragments are moved.
+OsteoTwin is an open-source **patient-specific surgical planning simulator** that gives orthopedic surgeons a deterministic, physics-grounded rehearsal environment. It features AI agents that debate reduction strategies, a 3D engine that validates every millimeter, and high-fidelity 3D-printable outputs for tactile practice.
 
-**Unforeseen Hardware Collisions:** A K-wire perfectly placed for temporary fixation might end up blocking the trajectory of the final locking plate.
+This is not a black-box AI. The LLM **never predicts physics.** Every collision and tension vector comes from a deterministic simulation engine. The AI's role is strictly to translate between the surgeon's natural language and the engine's math, grounded in verified medical literature.
 
-**The Isolation of the OR:** It is rare to have a "perfect sparring partner" to fiercely debate variables and validate surgical plans the night before the operation.
+## The Problem We Solve
 
-OsteoTwin simulates these exact variables beforehand. Even if the actual surgery deviates from the plan, a surgeon who has pre-simulated all potential pitfalls enters the OR with a clear, confident mind.
+Complex fracture reduction is one of the most spatially demanding tasks in surgery. Even with 3D-reconstructed CT scans, surgeons often face:
+
+* **Invisible Soft Tissue Tension:** Traditional navigation systems are blind to the pull of tendons and muscles during bone movement.
+* **Hidden Hardware Collisions:** Temporary fixation often blocks the trajectory of final locking plates—a discovery usually made too late in the OR.
+* **Cognitive Overload:** There is no "sparring partner" to challenge a surgeon's reduction strategy under stress.
+* **Visual Occlusion:** In the OR, ceiling cameras are often blocked by heads or shadows. OsteoTwin's voice-synced twin provides a "shadow-less" view.
+
+## What Makes This Different
+
+### Zero-Trust AI Architecture
+
+We do not trust LLM internal weights for medical safety. We enforce a **Zero-Trust Grounding** protocol:
+
+1. **Source-Only Knowledge** — All clinical claims must come from the cached knowledge base (AO Surgery Reference, OpenStax Anatomy, StatPearls) with explicit citations.
+2. **Deterministic Physics Isolation** — The LLM is the *interpreter*, not the *physicist*. All spatial calculations are computed by deterministic engines (Trimesh/SOFA).
+3. **Consultative, Not Prescriptive** — The system retrieves data (e.g., *"Based on AO Manual..."*) but never "recommends" a path. The surgeon holds final authority.
+4. **Verifiable Audit Trail** — Every plan mismatch or surgeon correction is logged to **GCP Firestore** with natural language rationale for retrospective peer review.
+
+### Multi-Agent Surgical Council
+
+Two AI agents (Claude and Gemini) independently analyze the case and cross-validate strategies. To bypass token limits and noise, **Gemini (Librarian)** distills 1.88M tokens into a high-density 20K-token brief, which **Claude (Surgeon)** then uses for precise reasoning.
+
+### Aesthetic & Tactile Fidelity
+
+* **Bi-Directional Digital Twin:** Manipulate fragments via 3D drag-and-drop; the system auto-syncs LPS coordinates and dispatches to the physics engine.
+* **Refinement Layer:** Our CAD pipeline applies a **0.3mm-0.5mm global fillet** to all models. This ensures professional "light-catching" aesthetics and smoother, stronger 3D prints.
+* **Physical Twin (3D Print):** Exports multi-material 3MF files. Surgeons print models to rehearse with real K-wires and screws.
 
 ## Core Pipeline
 
-From ingesting DICOM data to outputting a comprehensive surgical plan, OsteoTwin operates through the following pipeline:
-
-### 1. Radiological Description & Classification
-The LLM analyzes the fracture geometry based on the provided data, generating a detailed anatomical description. Through a feedback loop with the surgeon, it refines the context by applying international standard classifications (AO Foundation, Rockwood, Weber, etc.).
-
-### 2. Virtual OR Setup & C-arm Simulation
-Configures the patient's positioning and the C-arm insertion angles. Simulates and predicts the exact fluoroscopic images that will be seen on the C-arm monitor at those specific angles within the 3D viewer.
-
-### 3. Anatomical Approach Mapping
-When a specific surgical approach (e.g., the Henry approach) is selected, the system maps the trajectory, highlighting visible structures and critical "danger zones" (nerves, vessels) directly on the 3D mesh.
-
-### 4. Biomechanical Reduction Simulation
-- Calculates the expected tension vectors of attached muscles and tendons when a bone fragment is manipulated.
-- Allows the virtual placement of K-wires and reduction forceps to detect physical collisions between implants.
-- The LLM intervenes with real-time insights: "Elevating this fragment will be hindered by the tension of the supraspinatus. A targeted release is recommended."
-
-### 5. Multi-Agent Debate (The Surgical Council)
-Two or more AI agents (Claude and Gemini) engage in a structured debate based on the simulation data. Through cross-validation, the "Council" outputs Plan A, alternative Plans B and C, and a final operative document detailing anticipated difficulties and precautions for each step.
-
-### 6. Physical Twin (3D Printing Integration)
-Exports an STL file where bone fragments and key soft-tissue footprints are color-coded. Enables surgeons to 3D print the model and perform tactile practice with actual K-wires and screws the night before surgery. K-wires are excluded from STL exports — use real metal for practice.
-
-### 7. Intraoperative Voice Assistant
-A hands-free consultative voice agent that operates in the OR. The surgeon asks questions ("Osteo, check the K-wire trajectory") and receives concise, spoken clinical feedback based on the pre-operative plan and real-time simulation results. The agent NEVER gives commands — it only provides information when asked.
+```
+  DICOM CT Scan
+       |
+       v
+  [TotalSegmentator] ──> Bone Mesh Extraction (VTK marching cubes)
+       |
+       v
+  [Simulation Server] ──> Deterministic Physics
+  │  Collision detection (Trimesh) & Soft-tissue (SOFA)
+  │  Aesthetic Refinement (Automatic Fillets/Chamfers)
+       |
+       v
+  [Multi-Agent Orchestrator]
+  │  Librarian (Gemini) extracts brief -> Surgeon (Claude) reasons
+  │  Multi-Agent Debate: Cross-validation of reduction plans
+       |
+       v
+  [React Command Center]
+  │  3D Viewer (R3F) + Voice Assistant (Whisper/TTS)
+  │  Audit Logger (Firestore: quantitative + qualitative logs)
+       |
+       v
+  [3D Print Export] ──> 3MF with extruder metadata
+```
 
 ## Architecture
 
 ```
-                         React Command Center (:5173)
-                                  |
-              +-------------------+-------------------+
-              |                                       |
-  +-----------v-----------+          +----------------v-----------+
-  |  Planning Server :8200|          |  Simulation Server :8300   |
-  |  ---------------------|          |  ------------------------- |
-  |  Auth (JWT)           |          |  DICOM -> Mesh (VTK)       |
-  |  LLM Orchestrator     |   JSON   |  Collision (Trimesh)       |
-  |   +- Claude (Primary) |<-------->|  Soft-Tissue (SOFA/Spring) |
-  |   +- Gemini (2nd)     |          |  Branch State Manager      |
-  |  Multi-Agent Debate   |          |  Implant Library (20+)     |
-  |  Voice Assistant      |          |  STL Export (3D Print)     |
-  |  Knowledge Graph      |          |  TotalSegmentator          |
-  +-----------+-----------+          +----------------------------+
-              |
-  +-----------v-----------+
-  |  Neo4j Graph DB       |
-  |  (Anatomical Rules,   |
-  |   Surgeon Corrections)|
-  +------------------------+
+                      React Command Center (:5173)
+                               |
+               +---------------+---------------+
+               |                               |
+   +-----------v-----------+   +---------------v-----------+
+   |  Planning Server :8200|   |  Simulation Server :8300  |
+   |  ---------------------|   |  ------------------------ |
+   |  Zero-Trust LLM Agent | J |  Mesh Processing (VTK)    |
+   |  Multi-Agent Debate   | S |  Collision (Trimesh)      |
+   |  Knowledge Cache      | O |  Aesthetic CAD Refinement |
+   |  Firestore Logger     | N |  3MF/STL Export           |
+   +-----------+-----------+   +---------------------------+
+               |
+   +-----------v-----------+
+   |  Neo4j Knowledge Graph |   Firestore (clinical_case_logs)
+   |  (Anatomical Rules)    |   GCS (DICOM, backups)
+   +------------------------+
 ```
 
-**Strict Rule:** The LLM NEVER predicts physics. All collision detection, tension estimation, and spatial calculations are computed exclusively by the Simulation Server via deterministic engines (Trimesh/VTK/SOFA). The LLM acts as an intelligent translator between natural language and structured simulation requests.
-
-**State Branching:** The surgeon's view is on `Branch: Main`. The LLM runs background simulations on `Branch: LLM_Hypothesis` — changes are only promoted to Main when the surgeon explicitly approves.
-
-### Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | FastAPI (dual-server: Planning :8200 + Simulation :8300) |
-| Frontend | React + Tailwind v4 + Lucide (Command Center :5173) |
-| 3D/Physics | VTK, Trimesh, SOFA Framework (spring-mass fallback) |
-| AI Orchestration | Anthropic SDK (Claude), Google GenAI (Gemini) |
-| Segmentation | TotalSegmentator (automated CT bone extraction) |
-| Knowledge Graph | Neo4j (anatomical rules, surgeon corrections) |
-| Medical Imaging | pydicom, VTK marching cubes |
-| Voice | Whisper (STT), Edge/Google/OpenAI TTS |
-| 3D Print | 3MF multi-material export, named-STL ZIP fallback |
-| Infrastructure | GCP (Secret Manager, Cloud Storage, Pub/Sub, Spot VMs) |
+| Backend | FastAPI (Planning :8200 + Simulation :8300) |
+| Frontend | React 19 + Tailwind v4 + Three.js/R3F |
+| 3D/Physics | VTK, Trimesh, SOFA Framework |
+| AI | Anthropic Claude 3.5 Sonnet, Google Gemini 1.5 Pro |
+| Data | GCP Firestore, GCS, Pub/Sub, Neo4j |
 | IaC | Terraform |
-| Services | NSSM (Windows auto-start), Task Scheduler (daily backup) |
-
-### Project Structure
-
-```
-OsteoTwin/
-+-- planning_server/        # Port 8200: Auth, LLM orchestration, voice, web UI
-|   +-- app/
-|       +-- auth/            # JWT authentication + admin approval
-|       +-- pipeline/        # LLM orchestration (Claude tool-use + Gemini)
-|       +-- voice/           # Intraoperative Voice Assistant
-|       +-- graph_db/        # Neo4j anatomical rule engine
-|       +-- simulation_client/ # HTTP client -> Simulation Server
-|       +-- web_ui/          # HTMX web interface
-|       +-- main.py
-+-- simulation_server/       # Port 8300: Deterministic physics engine
-|   +-- app/
-|       +-- mesh_processor/  # DICOM -> 3D mesh, implants, STL export
-|       +-- collision/       # Trimesh rigid-body collision
-|       +-- soft_tissue/     # SOFA FEA + spring-mass fallback
-|       +-- main.py
-|   +-- worker.py            # Pub/Sub worker (checkpoint/failover on Spot VMs)
-+-- dashboard/               # React Command Center (:5173)
-|   +-- src/
-|       +-- lib/             # API client, coordinateMapper (Three.js <-> LPS)
-|       +-- components/      # Sidebar, StatusCard
-|       +-- pages/           # Overview, Cases, Viewer, Voice, PrinterAdmin, Settings
-+-- shared/                  # Pydantic schemas (single source of truth)
-|   +-- schemas/             # FractureCase, ReductionSimulation, AgentDebate, SpatialSemantic
-|   +-- kinematics.py            # Clinical terms <-> LPS math translation
-|   +-- simulation_protocol.py   # SimActionRequest / SimActionResponse
-|   +-- collision_protocol.py    # CollisionCheckRequest / CollisionCheckResponse
-|   +-- soft_tissue_protocol.py  # SoftTissueSimRequest / SoftTissueSimResponse
-+-- infra/terraform/         # GCP project (Secret Manager, Storage, Pub/Sub, Spot VMs)
-+-- system/                  # Windows services, backup/restore, DICOM cache
-+-- tests/                   # E2E integration tests
-```
+| License | MIT |
 
 ## Quick Start
 
 ```bash
-# 1. Clone and setup
+# 1. Setup environment
 git clone https://github.com/agkdc1/OsteoTwin.git
-cd OsteoTwin
-python -m venv .venv
-source .venv/Scripts/activate   # Windows: .venv\Scripts\activate
+cd OsteoTwin && python -m venv .venv && source .venv/bin/activate
 pip install -r planning_server/requirements.txt
 pip install -r simulation_server/requirements.txt
 
-# 2. Configure secrets
-cp .env.example .env
-# Fill in API keys (or run: bash system/setup_gcp.sh)
+# 2. Run servers
+python -m planning_server.app.main     # Port 8200
+python -m simulation_server.app.main   # Port 8300
 
-# 3. Run servers
-python -m planning_server.app.main    # Port 8200
-python -m simulation_server.app.main  # Port 8300
-
-# 4. Dashboard (optional)
-cd dashboard && npm install && npm run dev  # Port 5173
-
-# 5. Install as Windows services (optional, requires admin)
-# Run as Admin: .\system\services.ps1 install && .\system\services.ps1 start
+# 3. Dashboard
+cd dashboard && npm install && npm run dev   # Port 5173
 ```
 
-## Phase Status
+## License
 
-- [x] **Phase 0:** Project scaffolding, shared Pydantic schemas, server skeletons
-- [x] **Phase 1:** Rigid body collision, JWT auth, LLM orchestrator (Claude tool-use), multi-agent debate (Claude vs Gemini), DICOM pipeline, Neo4j scaffold, HTMX web UI, Windows services
-- [x] **Phase 2:** TotalSegmentator, implant CAD library (20+ items), smart sizing, DICOM-to-mesh tested (2 fragments, 35K verts)
-- [x] **Cloud Infra:** Pub/Sub queue, checkpoint bucket, dormant Spot VM (size=0), worker.py with checkpoint/failover
-- [x] **Phase 3:** STL export for 3D printing (color-coded fragments + plates, K-wires excluded)
-- [x] **Phase 4:** E2E integration test (8/8 passed), live Claude tool-use verified
-- [x] **React Dashboard:** Command Center (Vite + React + Tailwind v4 + Lucide)
-- [x] **Phase 5:** SOFA soft-tissue scaffolding (spring-mass fallback active, full SOFA pending GPU quota)
-- [x] **Phase 6:** Intraoperative Voice Assistant (consultative mode, text-in/text-out)
-- [x] **Knowledge Cache:** 44 open access sources with Anthropic prompt caching (AO Surgery Reference all 25 body regions + spine, OpenStax Anatomy, StatPearls, WFNS Spine, ~769K tokens total, 95% cost reduction)
-- [x] **Backup:** Daily 2 AM backup to GCS, 14-day hot + Coldline cold storage (never pruned)
-- [x] **Spatial-Semantic Schema:** LPS coordinate standard, FragmentIdentity, SurgicalAction, kinematics bridge (clinical terms ↔ LPS math), side-aware sign convention
-- [x] **Phase 7:** Physical Print Export — PrinterConfig admin UI, 3MF multi-material export with extruder metadata, named-STL ZIP fallback, color-to-extruder mapping
-- [x] **Phase 8:** Bi-directional 3D UI Sync — coordinateMapper (Three.js Y-up ↔ LPS Z-up), TransformControls on fragments, drag→SurgicalAction dispatch, sync-ui-action endpoint, Claude context injection
-- [x] **Phase 9:** Autonomous Catalog-to-CAD Pipeline — Manufacturer Alias System (3-letter codes), ParametricImplantSpec schema, 6-strike QA loop (Gemini validates → Claude corrects), OpenSCAD generation, 6-way orthographic rendering
-- [x] **Firestore Logging:** Clinical case logging (quantitative metrics + qualitative surgeon feedback), async Firestore writer, post-op deviation tracking, Terraform-provisioned
-- [ ] **Pending:** Full SOFA FEA with GPU (blocked: GCP GPU quota)
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-## Contributing
+---
 
-This project is an experiment that blurs the line between medicine and engineering. We welcome 3D graphics engineers, AI researchers, and, most importantly, surgeons who understand the reality of the OR. You don't need to know how to code to contribute — clinical feedback and surgical ideas are invaluable.
-
-**Disclaimer:** OsteoTwin is a simulation framework intended strictly for educational and research purposes. The plans and simulation results provided by this software cannot, under any circumstances, replace the clinical judgment of a licensed medical professional.
+**Disclaimer:** OsteoTwin is a research framework only. It does not provide medical advice. Plans cannot replace the judgment of a licensed professional.
