@@ -94,9 +94,14 @@
 ### Intraoperative C-arm Simulation
 - [x] DRR engine: ray-cast Beer-Lambert attenuation through bone mesh volume
 - [x] AP, Lateral, and arbitrary oblique projections (angle around Z-axis)
-- [x] PNG output (bone=white on black, standard X-ray appearance)
-- [x] Multi-view batch: AP + Lateral + 30/45/60 deg obliques in one call
-- [x] API: POST /api/v1/carm/render (single view), POST /api/v1/carm/multiview
+- [x] Physical C-arm model: real arc radius/throat depth, 5 named C-arm specs (Siemens Cios, GE OEC, Ziehm, Philips, Generic)
+- [x] OR bed model: width, height, mattress thickness, side rails, arm boards
+- [x] Patient bounding ellipsoid: position (supine/prone/lateral/beach chair), body dimensions
+- [x] Arc collision detection: C-arm arc sampled at 36 points, checked against bed bbox + patient ellipsoid + rail geometry
+- [x] Feasibility map: sweep all orbital/angular combinations, report achievable % and blocked angles
+- [x] OR scene 3D rendering: bed (gray), patient (skin tone), C-arm arc (blue), X-ray source (red), detector (green)
+- [x] 6-view stitched rendering (top/bottom/front/back/left/right) for Gemini validation
+- [x] Gemini validation pipeline: scene image + constraints + specs sent to Gemini for confirmation (sterile drape, cable routing, anesthesia equipment)
 - [ ] Compare virtual C-arm with actual OR images (future)
 
 ### Surgical Approach Mapping

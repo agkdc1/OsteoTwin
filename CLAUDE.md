@@ -205,6 +205,10 @@ Left/right sign flips are handled automatically in `/shared/kinematics.py`:
 - `POST /api/v1/soft-tissue/simulate` — soft-tissue biomechanical simulation
 - `POST /api/v1/carm/render` — render simulated C-arm fluoroscopy (DRR) as PNG
 - `POST /api/v1/carm/multiview` — render standard C-arm views (AP, lateral, obliques)
+- `POST /api/v1/carm/feasibility` — check if C-arm pose is physically achievable (arc vs bed vs patient collision)
+- `POST /api/v1/carm/feasibility-map` — full map of achievable angles (heatmap)
+- `POST /api/v1/carm/scene-6view` — render 3D OR scene (bed + patient + C-arm) from 6 angles
+- `POST /api/v1/carm/validate-with-gemini` — full pipeline: feasibility + 6-view + Gemini confirmation
 - `GET /api/v1/approaches` — list surgical approaches (filterable by region)
 - `GET /api/v1/approaches/{key}` — approach detail with danger zones and layers
 - `GET /api/v1/approaches/{key}/danger-zones.stl` — danger zone spheres as STL overlay
@@ -259,6 +263,6 @@ pytest tests/test_e2e_pipeline.py -v
 - [x] Firestore Clinical Logging — SurgicalCaseLog schema (quantitative + qualitative), FirestoreFeedbackLogger (async, fire-and-forget), auto delta computation, post-op feedback, Terraform provisioning
 - [x] THUMS v7.1 Integration — LS-DYNA .k parser (2381 parts, 1975 materials, 840K nodes, 2.1M elements), thums_anatomical_map.json, VTK mesh export, SOFA material_configs.json, mass validation, 4 subjects (AF05/AF50/AM50/AM95), GCS backup, THUMSMaterialDB loader wired into soft-tissue engine
 - [x] Phase 9 CAD Pipeline fully wired — Gemini extraction, Claude SCAD generation, OpenSCAD 6-way render + Pillow stitch, Gemini QA validation (XML parsing), Claude auto-correction, OpenSCAD STL/3MF export
-- [x] C-arm Simulation — DRR engine (ray-cast Beer-Lambert attenuation), AP/lateral/oblique projections, PNG output
+- [x] C-arm Simulation — DRR engine, physical C-arm model (arc radius, throat depth, bed, patient, rails), collision detection (arc vs bed/patient/rails), feasibility map, OR scene 6-view rendering, Gemini validation pipeline
 - [x] Surgical Approach Atlas — 5 named approaches (Henry, Thompson, Kocher-Langenbeck, Deltopectoral, Lateral Knee) with danger zones, layers, source citations, STL danger zone overlay
 - [x] THUMS mesh decimation — LOD1 (50%), LOD2 (25%) via quadric decimation, meshio VTK reader
