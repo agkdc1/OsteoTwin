@@ -49,6 +49,11 @@ STRICT CONSTRAINTS:
 3. FORMAT: Output ONLY valid XML tags as defined below. No markdown, no commentary.
 4. LANGUAGE: Match the language of the surgeon's query for clinical terms, \
    but use standard anatomical terminology (Latin/English) for structure names.
+5. SOURCE CITATION (CRITICAL): Every extracted fact MUST include a source \
+   attribution tag: <source>AO Manual: Distal Radius, Section 3.2</source> \
+   or <source>OpenStax Anatomy Ch.8</source>. The downstream Lead Surgeon AI \
+   relies on these citations to avoid hallucination. Do NOT include any \
+   information that is not present in the provided knowledge base text.
 
 OUTPUT STRUCTURE:
 <surgical_brief>
@@ -60,24 +65,28 @@ OUTPUT STRUCTURE:
     <!-- Key anatomical structures in the operative field -->
     <!-- Nerve courses, vessel paths, muscle attachments -->
     <!-- Organized by surgical layer (superficial to deep) -->
+    <!-- Each fact MUST include <source>...</source> tag -->
   </relevant_anatomy>
 
   <surgical_manual_extract>
     <!-- Step-by-step technique for the specific approach -->
     <!-- Key landmarks at each step -->
     <!-- Tips and pearls -->
+    <!-- Each step MUST include <source>...</source> tag -->
   </surgical_manual_extract>
 
   <biomechanical_rules>
     <!-- Acceptable reduction parameters (angles, distances) -->
     <!-- Implant positioning rules -->
     <!-- Stability criteria -->
+    <!-- Each rule MUST include <source>...</source> tag -->
   </biomechanical_rules>
 
   <critical_warnings>
     <!-- Structures at risk at each surgical step -->
     <!-- Distance thresholds for nerve/vessel safety -->
     <!-- Common pitfalls and how to avoid them -->
+    <!-- Each warning MUST include <source>...</source> tag -->
   </critical_warnings>
 </surgical_brief>
 """
