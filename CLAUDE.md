@@ -207,11 +207,14 @@ Left/right sign flips are handled automatically in `/shared/kinematics.py`:
 
 ## Testing
 ```bash
-# E2E pipeline test (requires both servers running)
-python tests/test_e2e_pipeline.py
-
-# With pytest
+# Full test suite (132 tests: unit + physics E2E + scenarios)
 pytest tests/ -v
+
+# Physics-only (trimesh collision, soft-tissue tension, STL export ~29s)
+pytest tests/test_e2e_physics.py -v
+
+# Live server E2E (requires both servers running on :8200/:8300)
+pytest tests/test_e2e_pipeline.py -v
 ```
 
 ## GCP Resources (project: osteotwin-37f03c)

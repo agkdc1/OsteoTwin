@@ -51,13 +51,30 @@ if [ -d "${PROJECT_ROOT}/simulation_server/mesh_cache" ]; then
     fi
 fi
 
-# 5. Environment config (without secrets — secrets are in Secret Manager)
+# 5. Printer configs
+if [ -f "${PROJECT_ROOT}/planning_server/data/printer_configs.json" ]; then
+    cp "${PROJECT_ROOT}/planning_server/data/printer_configs.json" "${BACKUP_DIR}/printer_configs.json"
+    echo "[+] Printer configs copied"
+fi
+
+# 6. THUMS parsed output (anatomical maps, material configs, mass validation)
+if [ -d "${PROJECT_ROOT}/fea/thums_output" ]; then
+    THUMS_SIZE=$(du -sm "${PROJECT_ROOT}/fea/thums_output" 2>/dev/null | cut -f1)
+    if [ "${THUMS_SIZE:-0}" -lt 100 ]; then
+        cp -r "${PROJECT_ROOT}/fea/thums_output" "${BACKUP_DIR}/thums_output"
+        echo "[+] THUMS parsed output copied (${THUMS_SIZE}MB)"
+    else
+        echo "[!] THUMS output too large (${THUMS_SIZE}MB) — use GCS: gs://${GCP_PROJECT}-data/thums_v71_parsed/"
+    fi
+fi
+
+# 7. Environment config (without secrets — secrets are in Secret Manager)
 if [ -f "${PROJECT_ROOT}/.env" ]; then
     grep -v '_KEY\|_SECRET\|PASSWORD' "${PROJECT_ROOT}/.env" > "${BACKUP_DIR}/env.nonsecret" || true
     echo "[+] Non-secret env config copied"
 fi
 
-# 6. Terraform state
+# 8. Terraform state
 if [ -f "${PROJECT_ROOT}/infra/terraform/terraform.tfstate" ]; then
     cp "${PROJECT_ROOT}/infra/terraform/terraform.tfstate" "${BACKUP_DIR}/terraform.tfstate"
     echo "[+] Terraform state copied"

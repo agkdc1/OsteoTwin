@@ -20,9 +20,13 @@ pydicom>=3.0.0
 # Collision detection (trimesh backends)
 scipy>=1.14.0
 rtree>=1.3.0
+python-fcl>=0.7.0               # mesh-mesh boolean collision (FCL library)
 
 # STL export for 3D printing
 numpy-stl>=3.1.0
 
 # Inter-service auth
 python-dotenv>=1.0.0
+
+# FEA / THUMS data
+PyMuPDF>=1.25.0                  # PDF manual parsing

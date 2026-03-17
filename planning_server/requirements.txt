@@ -42,3 +42,6 @@ beautifulsoup4>=4.12.0
 # Voice assistant (STT/TTS)
 edge-tts>=7.0.0
 soundfile>=0.13.0
+
+# GCP services
+google-cloud-firestore>=2.19.0   # clinical case logging

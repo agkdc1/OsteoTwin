@@ -59,7 +59,21 @@ if [ -d "${RESTORE_DIR}/mesh_cache" ]; then
     echo "[+] Mesh cache restored"
 fi
 
-# 5. Terraform state
+# 5. Printer configs
+if [ -f "${RESTORE_DIR}/printer_configs.json" ]; then
+    mkdir -p "${PROJECT_ROOT}/planning_server/data"
+    cp "${RESTORE_DIR}/printer_configs.json" "${PROJECT_ROOT}/planning_server/data/printer_configs.json"
+    echo "[+] Printer configs restored"
+fi
+
+# 6. THUMS parsed output
+if [ -d "${RESTORE_DIR}/thums_output" ]; then
+    mkdir -p "${PROJECT_ROOT}/fea"
+    cp -r "${RESTORE_DIR}/thums_output" "${PROJECT_ROOT}/fea/thums_output"
+    echo "[+] THUMS parsed output restored"
+fi
+
+# 7. Terraform state
 if [ -f "${RESTORE_DIR}/terraform.tfstate" ]; then
     mkdir -p "${PROJECT_ROOT}/infra/terraform"
     cp "${RESTORE_DIR}/terraform.tfstate" "${PROJECT_ROOT}/infra/terraform/terraform.tfstate"
@@ -76,3 +90,6 @@ echo "  bash system/fetch_secrets.sh ${GCP_PROJECT}"
 echo ""
 echo "To restore DICOM files for a case, run:"
 echo "  bash system/dicom_cache.sh pull <case_id>"
+echo ""
+echo "To restore raw THUMS data (1GB), run:"
+echo "  gcloud storage cp -r gs://${GCP_PROJECT}-data/thums_v71/ fea/thums/"
