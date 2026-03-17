@@ -344,20 +344,47 @@ def validate_mass(
         total_volume_mm3 = 0.0
         for el in solids:
             nids = el["nodes"]
-            coords = [nodes.get(n) for n in nids if n in nodes]
-            if len(coords) == 4:
-                # Tetrahedron volume
-                a, b, c, d = [np.array(p) for p in coords]
+            coords_raw = [nodes.get(n) for n in nids if n in nodes]
+            if not coords_raw:
+                continue
+
+            # Deduplicate nodes (degenerate hex = collapsed tet/wedge)
+            seen = set()
+            unique_coords = []
+            for n, c in zip(nids, coords_raw):
+                if c is not None and n not in seen:
+                    seen.add(n)
+                    unique_coords.append(c)
+
+            n_unique = len(unique_coords)
+
+            if n_unique == 4:
+                # Tetrahedron (or degenerate hex collapsed to tet)
+                a, b, c, d = [np.array(p) for p in unique_coords]
                 vol = abs(np.dot(b - a, np.cross(c - a, d - a))) / 6.0
                 total_volume_mm3 += vol
-            elif len(coords) == 8:
-                # Hexahedron: approximate by splitting into 5 tetrahedra
-                pts = [np.array(p) for p in coords]
-                # Simple decomposition (not exact but within ~5%)
-                for tet_ids in [(0,1,3,4), (1,2,3,6), (1,4,5,6), (3,4,6,7), (1,3,4,6)]:
-                    a, b, c, d = [pts[i] for i in tet_ids]
-                    vol = abs(np.dot(b - a, np.cross(c - a, d - a))) / 6.0
-                    total_volume_mm3 += vol
+            elif n_unique >= 5:
+                # Hex/wedge: decompose into tetrahedra using first 4+ unique nodes
+                pts = [np.array(p) for p in unique_coords]
+                if n_unique >= 8:
+                    for tet_ids in [(0,1,3,4), (1,2,3,6), (1,4,5,6), (3,4,6,7), (1,3,4,6)]:
+                        if all(i < n_unique for i in tet_ids):
+                            a, b, c, d = [pts[i] for i in tet_ids]
+                            vol = abs(np.dot(b - a, np.cross(c - a, d - a))) / 6.0
+                            total_volume_mm3 += vol
+                elif n_unique >= 6:
+                    # Wedge -> 3 tets
+                    for tet_ids in [(0,1,2,3), (1,2,3,4), (2,3,4,5)]:
+                        if all(i < n_unique for i in tet_ids):
+                            a, b, c, d = [pts[i] for i in tet_ids]
+                            vol = abs(np.dot(b - a, np.cross(c - a, d - a))) / 6.0
+                            total_volume_mm3 += vol
+                else:
+                    # 5 unique nodes -> 2 tets
+                    for tet_ids in [(0,1,2,3), (0,2,3,4)]:
+                        a, b, c, d = [pts[i] for i in tet_ids]
+                        vol = abs(np.dot(b - a, np.cross(c - a, d - a))) / 6.0
+                        total_volume_mm3 += vol
 
         computed_mass_kg = total_volume_mm3 * density_kg_mm3
 

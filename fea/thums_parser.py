@@ -521,6 +521,32 @@ def main():
         k_file = k_files[0]
         model = parse_k_file(k_file, subj)
 
+        # Parse auxiliary .k files (bone materials, muscle activation, etc.)
+        aux_files = [
+            model_dir / f"mat_bone_{subj}_V71_Occ_no_fracture.k",
+            model_dir / f"mat_bone_{subj}_V71_Occ_fracture.k",
+        ]
+        # Also check muscle activation files
+        muscle_dir = base_dir / dir_name / "Muscle_activation"
+        if muscle_dir.exists():
+            aux_files.extend(muscle_dir.glob("*.k"))
+            muscle_ctrl = muscle_dir / "muscle_control"
+            if muscle_ctrl.exists():
+                aux_files.extend(muscle_ctrl.glob("*.k"))
+
+        for aux in aux_files:
+            if aux.exists():
+                logger.info("  Parsing auxiliary: %s", aux.name)
+                aux_model = parse_k_file(aux, subj)
+                # Merge materials (aux overrides/fills gaps)
+                for mid, mat in aux_model.materials.items():
+                    if mid not in model.materials or model.materials[mid].mat_type == "UNKNOWN":
+                        model.materials[mid] = mat
+                # Merge parts if any new ones
+                for pid, part in aux_model.parts.items():
+                    if pid not in model.parts:
+                        model.parts[pid] = part
+
         # Build outputs
         anat_map = build_anatomical_map(model)
         summary = build_material_summary(model)
