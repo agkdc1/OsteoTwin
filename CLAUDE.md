@@ -201,8 +201,9 @@ Left/right sign flips are handled automatically in `/shared/kinematics.py`:
 - `GET /api/v1/implants/suggest` — smart implant sizing
 - `POST /api/v1/export/stl` — 3D print STL export
 - `GET /api/v1/export/stl/{case_id}` — list/download exported STLs
-- `GET /api/v1/soft-tissue/status` — SOFA engine status
+- `GET /api/v1/soft-tissue/status` — SOFA engine status + THUMS data availability
 - `POST /api/v1/soft-tissue/simulate` — soft-tissue biomechanical simulation
+- `GET /api/v1/soft-tissue/thums/{subject}` — query THUMS material database
 
 ## Testing
 ```bash
@@ -244,4 +245,5 @@ pytest tests/ -v
 - [x] Phase 8: Bi-directional 3D UI Sync — coordinateMapper.ts (Three.js Y-up ↔ LPS Z-up), TransformControls on fragments, drag→SurgicalAction dispatch, sync-ui-action endpoint, Claude context injection
 - [x] Phase 9: Autonomous Catalog-to-CAD Pipeline — ManufacturerAlias (3-letter codes), ParametricImplantSpec, 6-strike QA loop (Gemini validates, Claude corrects), OpenSCAD generation, 6-way rendering, auto-export on approval
 - [x] Firestore Clinical Logging — SurgicalCaseLog schema (quantitative + qualitative), FirestoreFeedbackLogger (async, fire-and-forget), auto delta computation, post-op feedback, Terraform provisioning
-- [x] THUMS v7.1 Integration — LS-DYNA .k parser (2381 parts, 1975 materials, 840K nodes, 2.1M elements), thums_anatomical_map.json, VTK mesh export, SOFA material_configs.json, mass validation, 4 subjects (AF05/AF50/AM50/AM95), GCS backup
+- [x] THUMS v7.1 Integration — LS-DYNA .k parser (2381 parts, 1975 materials, 840K nodes, 2.1M elements), thums_anatomical_map.json, VTK mesh export, SOFA material_configs.json, mass validation, 4 subjects (AF05/AF50/AM50/AM95), GCS backup, THUMSMaterialDB loader wired into soft-tissue engine
+- [x] Phase 9 CAD Pipeline fully wired — Gemini extraction, Claude SCAD generation, OpenSCAD 6-way render + Pillow stitch, Gemini QA validation (XML parsing), Claude auto-correction, OpenSCAD STL/3MF export

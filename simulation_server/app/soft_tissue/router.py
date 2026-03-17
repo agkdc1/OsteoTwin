@@ -21,6 +21,7 @@ from shared.soft_tissue_protocol import (
 
 from ..auth import verify_api_key
 from .engine import SoftTissueEngine, sofa_available
+from .thums_loader import get_thums_db
 
 logger = logging.getLogger("osteotwin.soft_tissue.router")
 
@@ -36,10 +37,13 @@ _engine = SoftTissueEngine()
 
 @router.get("/status")
 async def soft_tissue_status():
-    """Check soft-tissue engine availability."""
+    """Check soft-tissue engine availability and THUMS data status."""
+    thums = get_thums_db()
     return {
         "sofa_available": sofa_available(),
         "fallback_mode": "spring-mass" if not sofa_available() else "sofa-fea",
+        "thums_loaded": thums.available,
+        "thums_summary": thums.summary() if thums.available else None,
         "description": (
             "SOFA FEA engine active" if sofa_available()
             else "Using spring-mass approximation (install SOFA for full FEA)"
@@ -128,11 +132,54 @@ async def simulate_soft_tissue(req: SoftTissueSimRequest) -> SoftTissueSimRespon
     )
 
 
-def _get_default_tissues(case_id: str) -> list[dict]:
-    """Return default tissue definitions for common fracture patterns.
+@router.get("/thums/{subject}")
+async def thums_material_data(subject: str, region: str = ""):
+    """Query THUMS material database for a specific subject and region."""
+    thums = get_thums_db(subject)
+    if not thums.available:
+        return {"error": f"THUMS data not available for {subject}", "available_subjects": ["AF05", "AF50", "AM50", "AM95"]}
 
-    In production, these would come from a database keyed by AO classification.
+    if region:
+        bone_parts = thums.get_bone_parts(region)
+        soft_parts = thums.get_soft_tissue_parts(region)
+        return {
+            "subject": subject,
+            "region": region,
+            "bone_parts": len(bone_parts),
+            "soft_tissue_parts": len(soft_parts),
+            "bone_samples": bone_parts[:10],
+            "soft_tissue_samples": soft_parts[:10],
+        }
+
+    return thums.summary()
+
+
+def _get_default_tissues(case_id: str) -> list[dict]:
+    """Return tissue definitions - THUMS-sourced when available, hardcoded fallback.
+
+    When THUMS data is loaded, returns anatomically accurate tissue properties
+    from the parsed THUMS v7.1 model. Falls back to simplified defaults otherwise.
     """
+    thums = get_thums_db()
+    if thums.available:
+        # Try to infer region from case_id naming convention
+        region = None
+        cid = case_id.lower()
+        if "wrist" in cid or "radius" in cid or "humerus" in cid:
+            region = "upper_extremity_right"
+        elif "femur" in cid or "tibia" in cid or "ankle" in cid or "knee" in cid:
+            region = "lower_extremity_right"
+        elif "pelvis" in cid or "hip" in cid:
+            region = "abdomen_pelvis"
+
+        if region:
+            thums_tissues = thums.build_tissue_definitions(region)
+            if thums_tissues:
+                logger.info("Using THUMS %s tissues for %s (%d definitions)",
+                            thums.subject, case_id, len(thums_tissues))
+                return thums_tissues
+
+    # Fallback to hardcoded defaults
     return [
         {
             "tissue_id": "t_supraspinatus",
