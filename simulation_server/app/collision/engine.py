@@ -193,10 +193,6 @@ class CollisionEngine:
         mesh_a: trimesh.Trimesh = self._meshes[mesh_id_a]["mesh"]
         mesh_b: trimesh.Trimesh = self._meshes[mesh_id_b]["mesh"]
 
-        # Fast AABB check first
-        if not mesh_a.bounds_tree or not mesh_b.bounds_tree:
-            pass  # trimesh handles this internally
-
         try:
             collision_manager = trimesh.collision.CollisionManager()
             collision_manager.add_object(mesh_id_a, mesh_a)

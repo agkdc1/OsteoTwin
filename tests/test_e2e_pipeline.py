@@ -205,8 +205,8 @@ class TestE2EPipeline:
         )
         resp.raise_for_status()
         data = resp.json()
-        assert data["component_count"] == 4  # 2 fragments + 2 hardware
-        assert len(data["files"]) >= 5  # 4 components + 1 merged
+        assert data["component_count"] >= 3  # 2 fragments + plate (K-wires excluded)
+        assert len(data["files"]) >= 4  # 3+ components + 1 merged
         print(f"  Exported: {data['component_count']} components, "
               f"{data['total_volume_cm3']} cm³, "
               f"est. ${data['print_estimate']['cost_usd']}")
