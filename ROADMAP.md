@@ -70,7 +70,7 @@
 - [x] NVIDIA L4 per-region quota confirmed (1x, asia-northeast1)
 - [x] NVIDIA T4 per-region quota confirmed (1x, asia-northeast1)
 - [x] Terraform updated to g2-standard-8 + nvidia-l4
-- [ ] **BLOCKER:** `GPUS_ALL_REGIONS` global quota = 0 (overrides per-region). Request increase at Console.
+- [ ] **BLOCKER:** `GPUS_ALL_REGIONS` global quota = 0 (auto-declined twice). Paid account with credits. Retry quota request on 2026-03-21 (Friday).
 - [ ] Scale MIG to 1 for first cloud simulation run (after global quota approved)
 - [ ] Terraform-ize the full SOFA worker setup (bake into startup-script after initial test)
 
