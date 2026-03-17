@@ -67,10 +67,12 @@
 ## In Progress
 
 ### GPU Compute Activation
-- [x] NVIDIA L4 quota confirmed (1x, asia-northeast1) — Terraform updated to g2-standard-8
-- [x] NVIDIA T4 quota confirmed (1x, asia-northeast1)
-- [ ] Scale MIG to 1 for first cloud simulation run
-- [ ] Request T4x4 + L4x2 quota increase (scheduled 2026-03-19 via `system/request_gpu_quota.sh`)
+- [x] NVIDIA L4 per-region quota confirmed (1x, asia-northeast1)
+- [x] NVIDIA T4 per-region quota confirmed (1x, asia-northeast1)
+- [x] Terraform updated to g2-standard-8 + nvidia-l4
+- [ ] **BLOCKER:** `GPUS_ALL_REGIONS` global quota = 0 (overrides per-region). Request increase at Console.
+- [ ] Scale MIG to 1 for first cloud simulation run (after global quota approved)
+- [ ] Terraform-ize the full SOFA worker setup (bake into startup-script after initial test)
 
 ### SOFA FEA with Real THUMS Data
 - [x] THUMS material properties parsed and mapped to SOFA force fields
