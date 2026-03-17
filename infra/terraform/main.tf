@@ -171,7 +171,7 @@ resource "google_storage_bucket" "checkpoints" {
 
 resource "google_compute_instance_template" "sim_worker_spot" {
   name_prefix  = "osteotwin-sim-worker-"
-  machine_type = "n1-standard-8" # 8 vCPU, 30 GB RAM
+  machine_type = "g2-standard-8" # 8 vCPU, 32 GB RAM (L4-compatible)
   project      = google_project.osteotwin.project_id
   region       = local.region
 
@@ -183,14 +183,13 @@ resource "google_compute_instance_template" "sim_worker_spot" {
     instance_termination_action = "STOP"
   }
 
-  # GPU: NVIDIA T4 — available in asia-northeast1-a/c
-  # Requires GPU quota increase (default is 0 for new projects).
-  # Request at: https://console.cloud.google.com/iam-admin/quotas?project=osteotwin-37f03c
-  # Uncomment after quota is approved:
-  # guest_accelerator {
-  #   type  = "nvidia-tesla-t4"
-  #   count = 1
-  # }
+  # GPU: NVIDIA L4 (24GB VRAM) — quota=1 confirmed in asia-northeast1
+  # L4 is Ada Lovelace gen, 2x faster than T4 for FP32, native TF32 support
+  # Spot pricing ~$0.22/hr vs $0.70/hr on-demand
+  guest_accelerator {
+    type  = "nvidia-l4"
+    count = 1
+  }
 
   disk {
     source_image = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts"
@@ -251,7 +250,7 @@ resource "google_compute_instance_template" "sim_worker_spot" {
 resource "google_compute_instance_group_manager" "sim_workers" {
   name               = "osteotwin-sim-workers"
   base_instance_name = "sim-worker"
-  zone               = "${local.region}-a"  # T4 GPUs available here
+  zone               = "${local.region}-a"  # L4 GPUs available in all 3 zones
   project            = google_project.osteotwin.project_id
 
   version {
