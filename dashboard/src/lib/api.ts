@@ -149,6 +149,36 @@ export async function voiceSessions() {
   return resp.json();
 }
 
+// --- THUMS Anatomy ---
+export async function thumsSubjects() {
+  const resp = await simFetch('/v1/thums/subjects');
+  return resp.json();
+}
+
+export async function thumsParts(subject: string, region?: string, limit = 100) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (region) params.set('region', region);
+  const resp = await simFetch(`/v1/thums/${subject}/parts?${params}`);
+  return resp.json();
+}
+
+export async function thumsPartDetail(subject: string, partId: number) {
+  const resp = await simFetch(`/v1/thums/${subject}/parts/${partId}`);
+  return resp.json();
+}
+
+export function thumsMeshStlUrl(subject: string, partId: number): string {
+  return `${SIM_URL}/v1/thums/${subject}/mesh/${partId}.stl`;
+}
+
+export async function thumsLoadScene(subject: string, partIds: number[], branch = 'main') {
+  const resp = await simFetch(`/v1/thums/${subject}/load-scene`, {
+    method: 'POST',
+    body: JSON.stringify({ part_ids: partIds, branch }),
+  });
+  return resp.json();
+}
+
 // --- Knowledge Cache ---
 export async function knowledgeCacheStatus() {
   const resp = await authFetch('/api/v1/knowledge-cache/status');

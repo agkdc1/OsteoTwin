@@ -3,8 +3,8 @@ import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, TransformControls, Grid, Environment } from '@react-three/drei';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import * as THREE from 'three';
-import { Box, RotateCcw, Download, Layers, Move, RotateCw } from 'lucide-react';
-import { listMeshes, listExports, downloadStl, authFetch } from '../lib/api';
+import { Box, RotateCcw, Download, Layers, Move, RotateCw, Bone } from 'lucide-react';
+import { listMeshes, listExports, downloadStl, authFetch, thumsParts, thumsMeshStlUrl } from '../lib/api';
 import {
   computeTranslationDelta,
   computeRotationDelta,
@@ -460,6 +460,134 @@ export function Viewer() {
           )}
         </div>
       </div>
+
+      {/* THUMS Anatomy Browser */}
+      <ThumsAnatomyPanel
+        onLoadMesh={(url, color) => {
+          setSelectedStl(url);
+        }}
+      />
+    </div>
+  );
+}
+
+// --- THUMS Anatomy Browser Panel ---
+
+const THUMS_REGIONS = [
+  { key: 'lower_extremity', label: 'Lower Extremity' },
+  { key: 'upper_extremity', label: 'Upper Extremity' },
+  { key: 'thorax', label: 'Thorax' },
+  { key: 'head', label: 'Head' },
+  { key: 'abdomen', label: 'Abdomen & Pelvis' },
+  { key: 'neck', label: 'Neck' },
+];
+
+const MAT_COLORS: Record<string, string> = {
+  '*MAT_PIECEWISE_LINEAR_PLASTICITY': '#e8d8c0', // bone
+  '*MAT_ELASTIC': '#d4c4a8',                      // spongy bone
+  '*MAT_SIMPLIFIED_RUBBER': '#c87070',             // flesh
+  '*MAT_FABRIC': '#70a0c8',                        // ligament
+  '*MAT_FABRIC_TITLE': '#70a0c8',
+  '*MAT_VISCOELASTIC': '#a0c870',                  // marrow
+  '*MAT_LOW_DENSITY_FOAM': '#c8c870',              // meniscus
+  '*MAT_DAMAGE_2': '#c0b090',                      // patella spongy
+  '*MAT_NULL': '#888888',
+};
+
+interface ThumsPart {
+  part_id: number;
+  title: string;
+  region: string;
+  mat_type: string;
+  has_vtk: boolean;
+  youngs_modulus_mpa: number | null;
+  density_kg_mm3: number | null;
+}
+
+function ThumsAnatomyPanel({ onLoadMesh }: { onLoadMesh: (url: string, color: string) => void }) {
+  const [region, setRegion] = useState('lower_extremity');
+  const [parts, setParts] = useState<ThumsPart[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loadingParts, setLoadingParts] = useState(false);
+
+  useEffect(() => {
+    setLoadingParts(true);
+    thumsParts('AM50', region, 200)
+      .then(d => {
+        setParts(d.parts || []);
+        setTotal(d.total || 0);
+      })
+      .catch(() => setParts([]))
+      .finally(() => setLoadingParts(false));
+  }, [region]);
+
+  const vtkParts = parts.filter(p => p.has_vtk);
+
+  return (
+    <div className="rounded-lg p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-medium flex items-center gap-2">
+          <Bone size={16} style={{ color: 'var(--accent)' }} />
+          THUMS v7.1 Anatomy (AM50)
+        </h3>
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {vtkParts.length} meshes / {total} parts
+        </span>
+      </div>
+
+      {/* Region tabs */}
+      <div className="flex gap-1 mb-3 flex-wrap">
+        {THUMS_REGIONS.map(r => (
+          <button
+            key={r.key}
+            onClick={() => setRegion(r.key)}
+            className="px-2 py-1 rounded text-xs transition-colors"
+            style={{
+              background: region === r.key ? '#1a73e8' : 'transparent',
+              color: region === r.key ? 'white' : 'var(--text-muted)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Parts list */}
+      {loadingParts ? (
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Loading...</p>
+      ) : (
+        <div className="max-h-48 overflow-y-auto space-y-0.5">
+          {vtkParts.map(p => (
+            <div
+              key={p.part_id}
+              className="flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer hover:bg-white/5 transition-colors"
+              onClick={() => onLoadMesh(thumsMeshStlUrl('AM50', p.part_id), MAT_COLORS[p.mat_type] || '#cccccc')}
+            >
+              <div
+                className="w-3 h-3 rounded-full flex-shrink-0"
+                style={{ background: MAT_COLORS[p.mat_type] || '#888' }}
+              />
+              <span className="font-mono flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                {p.part_id}
+              </span>
+              <span className="truncate">{p.title}</span>
+              {p.youngs_modulus_mpa && (
+                <span className="flex-shrink-0 ml-auto" style={{ color: 'var(--text-muted)' }}>
+                  E={p.youngs_modulus_mpa >= 1000
+                    ? `${(p.youngs_modulus_mpa / 1000).toFixed(1)}GPa`
+                    : `${p.youngs_modulus_mpa}MPa`}
+                </span>
+              )}
+            </div>
+          ))}
+          {vtkParts.length === 0 && (
+            <p className="text-xs py-2 text-center" style={{ color: 'var(--text-muted)' }}>
+              No VTK meshes for this region. Run thums_mesh_converter.py first.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

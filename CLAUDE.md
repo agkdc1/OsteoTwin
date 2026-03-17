@@ -204,6 +204,10 @@ Left/right sign flips are handled automatically in `/shared/kinematics.py`:
 - `GET /api/v1/soft-tissue/status` — SOFA engine status + THUMS data availability
 - `POST /api/v1/soft-tissue/simulate` — soft-tissue biomechanical simulation
 - `GET /api/v1/soft-tissue/thums/{subject}` — query THUMS material database
+- `GET /api/v1/thums/subjects` — list available THUMS subjects
+- `GET /api/v1/thums/{subject}/parts` — list parts (filterable by region/mat_type)
+- `GET /api/v1/thums/{subject}/mesh/{part_id}.stl` — serve mesh as STL (VTK-to-STL on-the-fly)
+- `POST /api/v1/thums/{subject}/load-scene` — batch-load parts into collision engine
 
 ## Testing
 ```bash

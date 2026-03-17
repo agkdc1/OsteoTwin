@@ -84,9 +84,10 @@
 ## Next Up
 
 ### Full THUMS Mesh Conversion
-- [ ] Export all 2,381 parts per subject as VTK unstructured grids
+- [x] Export all 2,381 parts per subject as VTK unstructured grids (1,197 solid meshes, 133MB for AM50)
 - [ ] Decimate high-density soft-tissue meshes for real-time simulation (preserve anatomical boundaries)
-- [ ] Load THUMS VTK meshes into Three.js viewer for visualization
+- [x] THUMS mesh serving API (VTK-to-STL on-the-fly, region/mat_type filtering, batch scene loading)
+- [x] Three.js viewer: THUMS Anatomy Browser panel (browse by region, click to load, material color-coding)
 
 ### Intraoperative C-arm Simulation
 - [ ] Virtual C-arm positioning (AP, lateral, oblique angles)

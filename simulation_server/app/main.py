@@ -43,6 +43,7 @@ from .mesh_processor.implant_router import router as implant_router
 from .mesh_processor.segment_router import router as segment_router
 from .mesh_processor.export_router import router as export_router
 from .soft_tissue.router import router as soft_tissue_router
+from .mesh_processor.thums_router import router as thums_router
 
 logger = logging.getLogger("osteotwin.simulation")
 
@@ -111,6 +112,7 @@ app.include_router(implant_router)
 app.include_router(segment_router)
 app.include_router(export_router)
 app.include_router(soft_tissue_router)
+app.include_router(thums_router)
 
 
 # ---------------------------------------------------------------------------
