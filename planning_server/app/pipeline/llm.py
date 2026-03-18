@@ -26,9 +26,9 @@ class Provider(str, Enum):
 
 # Gemini model fallback chain (try in order on 429)
 GEMINI_FALLBACK_CHAIN = [
-    None,                    # use config.GEMINI_MODEL (default, e.g. gemini-2.5-flash)
+    None,                    # use config.GEMINI_MODEL (default: gemini-3-flash)
     "gemini-2.5-pro",       # fallback 1: more quota headroom
-    "gemini-2.0-flash",     # fallback 2: older model
+    "gemini-2.5-flash",     # fallback 2: previous gen flash
 ]
 GEMINI_RATE_LIMIT_WAIT_SEC = 60
 

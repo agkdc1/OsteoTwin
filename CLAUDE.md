@@ -142,7 +142,7 @@ Left/right sign flips are handled automatically in `/shared/kinematics.py`:
 - `from __future__ import annotations` in every module
 - Type hints on all public functions
 - Schemas use `Field(...)` with descriptions
-- LLM models: `claude-sonnet-4-20250514` (Claude), `gemini-2.5-flash` (Gemini)
+- LLM models: `claude-sonnet-4-20250514` (Claude), `gemini-3-flash` (Gemini, fallback: gemini-2.5-pro -> gemini-2.5-flash)
 - K-wires excluded from 3D print exports (use real metal for practice)
 
 ## Secrets
