@@ -17,7 +17,7 @@ GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 CLAUDE_MODEL_FAST: str = os.getenv("CLAUDE_MODEL_FAST", "claude-sonnet-4-20250514")
 CLAUDE_MODEL_SMART: str = os.getenv("CLAUDE_MODEL_SMART", "claude-sonnet-4-20250514")
 CLAUDE_MAX_RETRIES: int = int(os.getenv("CLAUDE_MAX_RETRIES", "3"))
-GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3-flash")
+GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 
 # --- JWT / Auth ---
 JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "change-me")
