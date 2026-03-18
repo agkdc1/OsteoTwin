@@ -177,6 +177,11 @@ Left/right sign flips are handled automatically in `/shared/kinematics.py`:
 - `POST /api/v1/admin/printer` — create/update printer profile
 - `DELETE /api/v1/admin/printer/{id}` — delete printer profile
 - `POST /api/v1/simulation/sync-ui-action` — receive manual 3D viewer drag → SurgicalAction
+- `POST /api/v1/audit/full` — run complete Grand Surgical Audit (Phase 1 + Phase 2)
+- `POST /api/v1/audit/condense` — Phase 1: Flash condenses discussion into audit package
+- `POST /api/v1/audit/run` — Phase 2: Pro audits package (Zero-Suggestion Policy)
+- `POST /api/v1/audit/resolve` — Phase 3: surgeon submits resolutions, triggers re-audit
+- `GET /api/v1/audit/status/{case_id}` — audit session status
 - `GET /api/v1/clinical-logs/status` — Firestore logger availability
 - `POST /api/v1/clinical-logs` — create clinical case log entry
 - `GET /api/v1/clinical-logs/case/{case_id}` — retrieve logs for a case
@@ -267,4 +272,5 @@ pytest tests/test_e2e_pipeline.py -v
 - [x] Surgical Approach Atlas — 5 named approaches (Henry, Thompson, Kocher-Langenbeck, Deltopectoral, Lateral Knee) with danger zones, layers, source citations, STL danger zone overlay
 - [x] THUMS mesh decimation — LOD1 (50%), LOD2 (25%) via quadric decimation, meshio VTK reader
 - [x] Advanced Reduction & Fixation — SurgicalPlan_v3 schema, clamp library (6 types), reduction priority tree, interference engine (K-wire vs clamp/plate/nerves), stability evaluator (delta-stability on clamp removal), Gemini multi-modal validation queries
-- [x] Gemini rate limit fallback — model chain (gemini-2.5-flash -> gemini-2.5-pro -> gemini-2.0-flash), 60s wait + retry on full exhaustion
+- [x] Gemini rate limit fallback — model chain (gemini-3-flash-preview -> gemini-3.1-pro-preview -> gemini-2.5-pro -> gemini-2.5-flash), 60s wait + retry on full exhaustion
+- [x] Grand Surgical Audit — two-stage Flash->Pro pipeline: Phase 1 (Flash condenses 100K+ tokens into audit package), Phase 2 (gemini-3.1-pro-preview Devil's Advocate audit with Zero-Suggestion Policy), Phase 3 (surgeon resolution loop), React Audit Report UI

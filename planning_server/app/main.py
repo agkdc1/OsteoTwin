@@ -29,6 +29,7 @@ from .voice.router import router as voice_router
 from .knowledge_cache.router import router as knowledge_cache_router
 from .printer.router import router as printer_router
 from .pipeline.sync_router import router as sync_router
+from .pipeline.audit_router import router as audit_router
 from .services.firestore_logger import clinical_logger
 from .services.clinical_log_router import router as clinical_log_router
 
@@ -91,6 +92,7 @@ app.include_router(voice_router)
 app.include_router(knowledge_cache_router)
 app.include_router(printer_router)
 app.include_router(sync_router)
+app.include_router(audit_router)
 app.include_router(clinical_log_router)
 
 

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FolderOpen, Box, Volume2, Server, Settings, LogOut, Printer } from 'lucide-react';
+import { LayoutDashboard, FolderOpen, Box, Volume2, Server, Settings, LogOut, Printer, ShieldAlert } from 'lucide-react';
 import { clearToken, getUsername } from '../lib/api';
 
 const navItems = [
@@ -7,6 +7,7 @@ const navItems = [
   { to: '/cases', icon: FolderOpen, label: 'Active Cases' },
   { to: '/viewer', icon: Box, label: '3D Viewer' },
   { to: '/voice', icon: Volume2, label: 'Voice Console' },
+  { to: '/audit', icon: ShieldAlert, label: 'Surgical Audit' },
   { to: '/infra', icon: Server, label: 'Infrastructure' },
   { to: '/admin/printer-config', icon: Printer, label: 'Printer Config' },
   { to: '/settings', icon: Settings, label: 'Settings' },

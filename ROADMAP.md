@@ -124,7 +124,15 @@
 - [x] Stability evaluator: clamp stiffness (spring model), K-wire bending stiffness (3EI/L^3), plate rigidity
 - [x] Delta-stability: compute stability change on clamp removal, flag unsafe removal sequence
 - [x] Gemini multi-modal queries: structured inference queries per camera view for visual reasoning
-- [x] Gemini model fallback chain: gemini-2.5-flash -> gemini-2.5-pro -> gemini-2.0-flash -> wait 60s -> retry
+- [x] Gemini model fallback chain: gemini-3-flash-preview -> gemini-3.1-pro-preview -> gemini-2.5-pro -> gemini-2.5-flash -> wait 60s -> retry
+
+### Grand Surgical Audit Pipeline
+- [x] Phase 1 (Flash): condense discussion log + draft plans + textbook into structured audit package (100K+ -> ~10K tokens)
+- [x] Phase 2 (gemini-3.1-pro-preview): Devil's Advocate audit with Zero-Suggestion Policy — identifies risks, demands surgeon resolution, never suggests alternatives
+- [x] Phase 3: Resolution loop API — surgeon submits clinical resolutions, re-audit until approved or override
+- [x] AuditManager: Flash-to-Pro routing, direct model call for auditor with fallback
+- [x] React Audit Report UI: severity-coded findings (critical/warning/info/approved), inline resolution inputs, re-audit button
+- [x] Audit API: /full, /condense, /run, /resolve, /status endpoints
 
 ## Future Vision
 
