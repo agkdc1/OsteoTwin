@@ -116,6 +116,16 @@
 
 ---
 
+### Advanced Reduction & Fixation Simulation
+- [x] SurgicalPlan_v3 unified schema (reduction sequence, clamping, interference, stability, Gemini queries)
+- [x] Reduction Priority Tree: articular -> metaphyseal -> shaft -> rotational -> length
+- [x] Clamp library: 6 types (Weber pointed, serrated, pelvic Jungbluth, Verbrugge lobster, speed lock, bone holder) with force specs
+- [x] Interference engine: K-wire vs clamp, K-wire vs plate zone, K-wire vs neurovascular danger zones, clamp vs plate
+- [x] Stability evaluator: clamp stiffness (spring model), K-wire bending stiffness (3EI/L^3), plate rigidity
+- [x] Delta-stability: compute stability change on clamp removal, flag unsafe removal sequence
+- [x] Gemini multi-modal queries: structured inference queries per camera view for visual reasoning
+- [x] Gemini model fallback chain: gemini-2.5-flash -> gemini-2.5-pro -> gemini-2.0-flash -> wait 60s -> retry
+
 ## Future Vision
 
 ### Clinical Feedback Loop

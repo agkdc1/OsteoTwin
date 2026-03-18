@@ -266,3 +266,5 @@ pytest tests/test_e2e_pipeline.py -v
 - [x] C-arm Simulation — DRR engine, physical C-arm model (arc radius, throat depth, bed, patient, rails), collision detection (arc vs bed/patient/rails), feasibility map, OR scene 6-view rendering, Gemini validation pipeline
 - [x] Surgical Approach Atlas — 5 named approaches (Henry, Thompson, Kocher-Langenbeck, Deltopectoral, Lateral Knee) with danger zones, layers, source citations, STL danger zone overlay
 - [x] THUMS mesh decimation — LOD1 (50%), LOD2 (25%) via quadric decimation, meshio VTK reader
+- [x] Advanced Reduction & Fixation — SurgicalPlan_v3 schema, clamp library (6 types), reduction priority tree, interference engine (K-wire vs clamp/plate/nerves), stability evaluator (delta-stability on clamp removal), Gemini multi-modal validation queries
+- [x] Gemini rate limit fallback — model chain (gemini-2.5-flash -> gemini-2.5-pro -> gemini-2.0-flash), 60s wait + retry on full exhaustion
