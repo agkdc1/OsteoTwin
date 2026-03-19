@@ -10,7 +10,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from .. import config
-from ..database import User, async_session
+from ..database import User, user_store
 
 bearer_scheme = HTTPBearer()
 
@@ -25,19 +25,19 @@ def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(pw_bytes, hashed.encode("utf-8"))
 
 
-def create_access_token(user_id: int, username: str) -> str:
+def create_access_token(user_id: str, username: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=24)
     return jwt.encode(
-        {"sub": str(user_id), "username": username, "type": "access", "exp": expire},
+        {"sub": user_id, "username": username, "type": "access", "exp": expire},
         config.JWT_SECRET_KEY,
         algorithm=config.JWT_ALGORITHM,
     )
 
 
-def create_refresh_token(user_id: int) -> str:
+def create_refresh_token(user_id: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(days=7)
     return jwt.encode(
-        {"sub": str(user_id), "type": "refresh", "exp": expire},
+        {"sub": user_id, "type": "refresh", "exp": expire},
         config.JWT_SECRET_KEY,
         algorithm=config.JWT_ALGORITHM,
     )
@@ -53,15 +53,11 @@ async def get_current_user(
         )
         if payload.get("type") != "access":
             raise HTTPException(status_code=401, detail="Invalid token type")
-        user_id = int(payload["sub"])
+        user_id = payload["sub"]
     except (JWTError, KeyError, ValueError):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    from sqlalchemy import select
-
-    async with async_session() as session:
-        result = await session.execute(select(User).where(User.id == user_id))
-        user = result.scalar_one_or_none()
+    user = await user_store.get_by_id(user_id)
 
     if not user:
         raise HTTPException(status_code=401, detail="User not found")

@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars and fill in your billing account ID
+# Find yours: gcloud billing accounts list
+billing_account = "XXXXXX-XXXXXX-XXXXXX"
+
+# GCP region (default: asia-northeast1)
+# region = "asia-northeast1"
+
+# GCS bucket region (us-west1 for free tier eligibility)
+# bucket_region = "us-west1"

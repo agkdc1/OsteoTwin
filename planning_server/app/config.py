@@ -38,13 +38,5 @@ NEO4J_URI: str = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER: str = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD: str = os.getenv("NEO4J_PASSWORD", "")
 
-# --- GCP ---
-GCP_PROJECT_ID: str = os.getenv("GCP_PROJECT_ID", "")
-
-# --- Database ---
-_DEFAULT_DB_DIR = Path(__file__).resolve().parent.parent / "data"
-_DEFAULT_DB_DIR.mkdir(parents=True, exist_ok=True)
-_DEFAULT_DB_PATH = _DEFAULT_DB_DIR / "osteotwin.db"
-DATABASE_URL: str = os.getenv(
-    "DATABASE_URL", f"sqlite+aiosqlite:///{_DEFAULT_DB_PATH}"
-)
+# --- GCP (REQUIRED — never rely on gcloud default; multiple projects share this machine) ---
+GCP_PROJECT_ID: str = os.getenv("GCP_PROJECT_ID", "osteotwin-37f03c")

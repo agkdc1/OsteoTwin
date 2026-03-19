@@ -1,7 +1,7 @@
 variable "billing_account" {
-  description = "GCP billing account ID"
+  description = "GCP billing account ID (required — run: gcloud billing accounts list)"
   type        = string
-  default     = "01379E-748455-3FDDAA"
+  # No default — each contributor provides their own billing account
 }
 
 variable "region" {

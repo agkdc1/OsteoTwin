@@ -312,7 +312,7 @@ def backup_to_gcs() -> int:
     try:
         from google.cloud import storage
 
-        client = storage.Client()
+        client = storage.Client(project=config.GCP_PROJECT_ID)
         bucket = client.bucket(GCS_BUCKET)
         count = 0
 
@@ -340,7 +340,7 @@ def restore_from_gcs() -> int:
     try:
         from google.cloud import storage
 
-        client = storage.Client()
+        client = storage.Client(project=config.GCP_PROJECT_ID)
         bucket = client.bucket(GCS_BUCKET)
         count = 0
 

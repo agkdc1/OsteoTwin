@@ -34,6 +34,7 @@ simulation_server/dicom_cache/
 infra/terraform/.terraform/
 infra/terraform/*.tfstate*
 infra/terraform/.terraform.lock.hcl
+infra/terraform/terraform.tfvars
 
 # Node (dashboard)
 dashboard/node_modules/

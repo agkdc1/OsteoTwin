@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
 
-from ..database import User, async_session
+from ..database import User, user_store
 from .dependencies import (
     create_access_token,
     create_refresh_token,
@@ -36,31 +35,24 @@ class TokenResponse(BaseModel):
 
 @router.post("/register", status_code=201)
 async def register(req: RegisterRequest):
-    async with async_session() as session:
-        existing = await session.execute(
-            select(User).where(User.username == req.username)
-        )
-        if existing.scalar_one_or_none():
-            raise HTTPException(status_code=409, detail="Username already taken")
+    existing = await user_store.get_by_username(req.username)
+    if existing:
+        raise HTTPException(status_code=409, detail="Username already taken")
 
-        user = User(
-            username=req.username,
-            hashed_password=hash_password(req.password),
-            role="user",
-            status="pending",
-        )
-        session.add(user)
-        await session.commit()
+    user = User(
+        id="",
+        username=req.username,
+        hashed_password=hash_password(req.password),
+        role="user",
+        status="pending",
+    )
+    await user_store.create_user(user)
     return {"message": "Registration successful. Awaiting admin approval."}
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest):
-    async with async_session() as session:
-        result = await session.execute(
-            select(User).where(User.username == req.username)
-        )
-        user = result.scalar_one_or_none()
+    user = await user_store.get_by_username(req.username)
 
     if not user or not verify_password(req.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")

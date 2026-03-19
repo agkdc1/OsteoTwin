@@ -53,19 +53,18 @@ class FirestoreFeedbackLogger:
         Silently degrades if google-cloud-firestore is not installed
         or credentials are unavailable — logging is non-critical.
         """
+        if not self._project_id:
+            logger.warning(
+                "GCP_PROJECT_ID not set — clinical logging disabled. "
+                "Set GCP_PROJECT_ID in .env to enable Firestore."
+            )
+            return
         try:
             from google.cloud.firestore_v1 import AsyncClient
 
-            kwargs: dict[str, Any] = {}
-            if self._project_id:
-                kwargs["project"] = self._project_id
-
-            self._db = AsyncClient(**kwargs)
+            self._db = AsyncClient(project=self._project_id)
             self._available = True
-            logger.info(
-                "Firestore logger connected (project=%s)",
-                self._project_id or "default",
-            )
+            logger.info("Firestore logger connected (project=%s)", self._project_id)
         except ImportError:
             logger.warning(
                 "google-cloud-firestore not installed — clinical logging disabled. "
@@ -213,4 +212,10 @@ class FirestoreFeedbackLogger:
 # Singleton instance (initialized in FastAPI lifespan)
 # ---------------------------------------------------------------------------
 
-clinical_logger = FirestoreFeedbackLogger()
+def _get_project_id() -> str:
+    """Read GCP_PROJECT_ID at import time (config already loaded)."""
+    import os
+    return os.getenv("GCP_PROJECT_ID", "osteotwin-37f03c")
+
+
+clinical_logger = FirestoreFeedbackLogger(project_id=_get_project_id())

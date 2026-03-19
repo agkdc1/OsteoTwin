@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import config
-from .database import init_db
+from .database import init_db, user_store
 from .graph_db.connection import graph_db
 
 # Routers
@@ -54,6 +54,7 @@ async def lifespan(app: FastAPI):
     from .knowledge_cache.heartbeat import stop_all_heartbeats
     stop_all_heartbeats()
     await clinical_logger.close()
+    await user_store.close()
     await graph_db.close()
     logger.info("Planning Server shut down.")
 

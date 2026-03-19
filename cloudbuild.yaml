@@ -1,0 +1,185 @@
+# Cloud Build CI/CD — builds and deploys all 3 services to Cloud Run
+# Trigger: push to main branch (or manual)
+#
+# Required substitutions (set in Cloud Build trigger or --substitutions):
+#   _REGION: GCP region (default: asia-northeast1)
+#   _PROJECT_ID: auto-populated by Cloud Build
+#
+# Usage:
+#   gcloud builds submit --config=cloudbuild.yaml \
+#     --substitutions=_REGION=asia-northeast1
+
+substitutions:
+  _REGION: asia-northeast1
+  _AR_REPO: osteotwin
+
+steps:
+  # --- Step 1: Build Planning Server ---
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/planning-server:${SHORT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/planning-server:latest'
+      - '-f'
+      - 'planning_server/Dockerfile'
+      - '.'
+    id: 'build-planning'
+
+  # --- Step 2: Build Simulation Server ---
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/simulation-server:${SHORT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/simulation-server:latest'
+      - '-f'
+      - 'simulation_server/Dockerfile'
+      - '.'
+    id: 'build-simulation'
+
+  # --- Step 3: Build Dashboard ---
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/dashboard:${SHORT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/dashboard:latest'
+      - '-f'
+      - 'dashboard/Dockerfile'
+      - '.'
+    id: 'build-dashboard'
+
+  # --- Step 4: Push all images (parallel builds, sequential push) ---
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '--all-tags', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/planning-server']
+    waitFor: ['build-planning']
+    id: 'push-planning'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '--all-tags', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/simulation-server']
+    waitFor: ['build-simulation']
+    id: 'push-simulation'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '--all-tags', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/dashboard']
+    waitFor: ['build-dashboard']
+    id: 'push-dashboard'
+
+  # --- Step 5: Deploy Planning Server to Cloud Run ---
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'osteotwin-planning'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/planning-server:${SHORT_SHA}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '2'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '3'
+      - '--timeout'
+      - '300'
+      - '--set-secrets'
+      - 'ANTHROPIC_API_KEY=anthropic-api-key:latest,GEMINI_API_KEY=gemini-api-key:latest,JWT_SECRET_KEY=jwt-secret-key:latest,SIM_API_KEY=sim-api-key:latest,NEO4J_PASSWORD=neo4j-password:latest,ADMIN_PASSWORD=admin-password:latest'
+      - '--set-env-vars'
+      - 'PLAN_HOST=0.0.0.0,PLAN_PORT=8080,GCP_PROJECT_ID=${PROJECT_ID}'
+      - '--update-env-vars'
+      - 'SIMULATION_SERVER_URL=PLACEHOLDER'
+    waitFor: ['push-planning']
+    id: 'deploy-planning'
+
+  # --- Step 6: Deploy Simulation Server to Cloud Run ---
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'osteotwin-simulation'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/simulation-server:${SHORT_SHA}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--no-allow-unauthenticated'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '4'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '3'
+      - '--timeout'
+      - '300'
+      - '--set-secrets'
+      - 'SIM_API_KEY=sim-api-key:latest'
+      - '--set-env-vars'
+      - 'SIM_HOST=0.0.0.0,SIM_PORT=8080,GCP_PROJECT_ID=${PROJECT_ID}'
+    waitFor: ['push-simulation']
+    id: 'deploy-simulation'
+
+  # --- Step 7: Wire up inter-service URLs ---
+  # After both services are deployed, update SIMULATION_SERVER_URL on planning
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        SIM_URL=$(gcloud run services describe osteotwin-simulation \
+          --region=${_REGION} --format='value(status.url)')
+        echo "Simulation Server URL: $${SIM_URL}"
+        gcloud run services update osteotwin-planning \
+          --region=${_REGION} \
+          --update-env-vars="SIMULATION_SERVER_URL=$${SIM_URL}"
+    waitFor: ['deploy-planning', 'deploy-simulation']
+    id: 'wire-urls'
+
+  # --- Step 8: Deploy Dashboard to Cloud Run ---
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        PLAN_URL=$(gcloud run services describe osteotwin-planning \
+          --region=${_REGION} --format='value(status.url)')
+        SIM_URL=$(gcloud run services describe osteotwin-simulation \
+          --region=${_REGION} --format='value(status.url)')
+        echo "Planning URL: $${PLAN_URL}"
+        echo "Simulation URL: $${SIM_URL}"
+        gcloud run deploy osteotwin-dashboard \
+          --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/dashboard:${SHORT_SHA} \
+          --region=${_REGION} \
+          --platform=managed \
+          --allow-unauthenticated \
+          --memory=256Mi \
+          --cpu=1 \
+          --min-instances=0 \
+          --max-instances=2 \
+          --timeout=60 \
+          --set-env-vars="PLANNING_API_URL=$${PLAN_URL},SIMULATION_API_URL=$${SIM_URL}"
+    waitFor: ['wire-urls', 'push-dashboard']
+    id: 'deploy-dashboard'
+
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/planning-server:${SHORT_SHA}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/simulation-server:${SHORT_SHA}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/dashboard:${SHORT_SHA}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'

@@ -8,10 +8,10 @@
 
 ### Core Platform
 - [x] Dual-server architecture (Planning :8200 + Simulation :8300)
-- [x] JWT auth with admin approval flow
+- [x] JWT auth with admin approval flow (Firestore-backed, free tier)
 - [x] React Command Center (Vite + Tailwind v4 + Three.js/R3F)
 - [x] Windows services (NSSM auto-start), daily 2 AM GCS backup
-- [x] Terraform-managed GCP infra (Storage, Pub/Sub, Firestore, Spot VMs)
+- [x] Terraform-managed GCP infra (Storage, Pub/Sub, Firestore, Spot VMs, Cloud Run, Artifact Registry)
 
 ### Simulation Engine
 - [x] Rigid-body collision detection (trimesh + FCL)
@@ -51,8 +51,9 @@
 - [x] Claude auto-correction loop with 6-strike safety halt
 - [x] OpenSCAD CLI STL/3MF export
 
-### Clinical Logging
-- [x] Firestore (Native Mode) for case lifecycle logging
+### Clinical Logging & Storage
+- [x] Firestore (Native Mode) for user auth + case lifecycle logging
+- [x] SQLite → Firestore migration: removed SQLAlchemy/aiosqlite, in-memory fallback for local dev
 - [x] Quantitative metrics: AI plan vs surgeon plan delta, time-to-decision
 - [x] Qualitative metrics: intent mismatch logs, post-op deviation logs
 - [x] Async fire-and-forget writer (non-blocking)
@@ -65,6 +66,17 @@
 ---
 
 ## In Progress
+
+### Cloud Run Migration
+- [x] Dockerfiles: Planning Server, Simulation Server, Dashboard (nginx + SPA)
+- [x] Artifact Registry: `osteotwin` Docker repo with 10-version retention
+- [x] Cloud Build CI/CD: parallel image builds, auto-deploy, inter-service URL wiring
+- [x] deploy.sh: manual deploy script (all/planning/simulation/dashboard/--cloud-build)
+- [x] Cloud Run Terraform: 3 services (planning 1Gi/2CPU, simulation 2Gi/4CPU, dashboard 256Mi)
+- [x] IAM: `osteotwin-cloudrun` SA → Secrets, GCS, Pub/Sub, Firestore; Cloud Build → AR + Run
+- [x] All GCP clients use explicit `project=` (never rely on gcloud defaults)
+- [ ] First live deploy to Cloud Run (after testing Docker builds)
+- [ ] Custom domain mapping (optional)
 
 ### GPU Compute Activation
 - [x] NVIDIA L4 per-region quota confirmed (1x, asia-northeast1)

@@ -62,3 +62,30 @@ output "secret_neo4j" {
   description = "Secret Manager ID for Neo4j password"
   value       = google_secret_manager_secret.neo4j_password.secret_id
 }
+
+# --- Cloud Run URLs ---
+
+output "planning_url" {
+  description = "Planning Server Cloud Run URL"
+  value       = google_cloud_run_v2_service.planning.uri
+}
+
+output "simulation_url" {
+  description = "Simulation Server Cloud Run URL"
+  value       = google_cloud_run_v2_service.simulation.uri
+}
+
+output "dashboard_url" {
+  description = "Dashboard Cloud Run URL"
+  value       = google_cloud_run_v2_service.dashboard.uri
+}
+
+output "artifact_registry" {
+  description = "Artifact Registry repository"
+  value       = "${google_artifact_registry_repository.osteotwin.location}-docker.pkg.dev/${local.project_id}/${google_artifact_registry_repository.osteotwin.repository_id}"
+}
+
+output "cloud_run_sa" {
+  description = "Cloud Run service account email"
+  value       = google_service_account.cloud_run.email
+}

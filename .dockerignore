@@ -1,0 +1,61 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*.egg-info
+.eggs
+.venv
+venv
+env
+dist
+build
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Data (not shipped in images — mounted or fetched at runtime)
+planning_server/data/
+simulation_server/jobs/
+simulation_server/mesh_cache/
+simulation_server/dicom_cache/
+planning_server/knowledge_data/
+fea/
+sample_data/
+logs/
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/*.tfstate*
+
+# Node (dashboard build is separate)
+dashboard/node_modules/
+dashboard/dist/
+
+# Docs
+*.md
+!requirements.txt
+LICENSE
+
+# System scripts (not needed in containers)
+system/services.ps1
+system/daily_backup.ps1
+
+# Medical data
+*.stl
+*.dcm
+*.nii
+*.nii.gz
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+*.env.local

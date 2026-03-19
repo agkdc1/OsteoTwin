@@ -26,11 +26,30 @@ As the Lead Engineer for OsteoTwin, you MUST adhere to the following "Zero-Trust
 - **Shared schemas**: All Pydantic models live in `/shared/` — single source of truth
 - **LLM never does physics**: All collision/tension computed by Simulation Server only
 - **State branching**: `main` = surgeon view, `LLM_Hypothesis` = AI sandbox
-- **Cloud infra**: GCP Pub/Sub queue + Spot GPU workers (dormant at size=0)
+- **Cloud infra**: Cloud Run (scale-to-zero) + Pub/Sub + Spot GPU + GCS + Firestore
 
 ## Running
 
-### Option 1: Windows Services (auto-start on boot)
+### Option 1: Cloud Run (production)
+```bash
+# First-time: provision GCP resources
+cd infra/terraform
+cp terraform.tfvars.example terraform.tfvars  # fill in billing_account
+terraform init && terraform apply
+
+# Deploy all services (builds Docker → pushes to Artifact Registry → deploys Cloud Run)
+bash system/deploy.sh
+
+# Deploy single service
+bash system/deploy.sh planning
+bash system/deploy.sh simulation
+bash system/deploy.sh dashboard
+
+# CI/CD via Cloud Build (triggered on push to main)
+bash system/deploy.sh --cloud-build
+```
+
+### Option 2: Windows Services (auto-start on boot)
 ```powershell
 # Run as Administrator
 .\system\services.ps1 install   # one-time setup
@@ -173,9 +192,15 @@ See memory file `project_batch_audit_todo.md` for full implementation checklist.
 - **GCS prefix**: `osteotwin_audit/jobs/` in shared bucket
 - **Cost**: 50% discount vs realtime, 65536 max_output_tokens
 
-### Cloud Migration Pattern (shared with ROBOT4KID)
-Both projects migrating to: Cloud Run (scale-to-zero) + Firestore (free tier) + Pub/Sub + Spot VM + GCS.
-See ROBOT4KID `infra/terraform/` for reference Terraform configs.
+### Cloud Architecture (Cloud Run)
+All services deployed to Cloud Run (scale-to-zero) in `asia-northeast1`:
+- **Planning Server** → `osteotwin-planning` (public, JWT auth, 1Gi/2CPU)
+- **Simulation Server** → `osteotwin-simulation` (internal only, API key auth, 2Gi/4CPU)
+- **Dashboard** → `osteotwin-dashboard` (public, nginx reverse proxy to backends)
+- **GPU Workers** → Spot VM MIG (Pub/Sub pull, dormant at size=0)
+- **Container Registry** → Artifact Registry (`asia-northeast1-docker.pkg.dev`)
+- **CI/CD** → Cloud Build (`cloudbuild.yaml`, auto-wires inter-service URLs)
+- **Secrets** → GCP Secret Manager (injected into Cloud Run at deploy)
 
 ## Key Endpoints
 
@@ -270,13 +295,19 @@ pytest tests/test_e2e_pipeline.py -v
 | Pub/Sub topic | `simulation-tasks-topic` | Async task queue |
 | Pub/Sub sub | `simulation-worker-sub` | Worker pull subscription |
 | Spot MIG | `osteotwin-sim-workers` | GPU workers (size=0) |
-| Firestore | `(default)` | Clinical case logging (Native Mode) |
+| Firestore | `(default)` | User auth + clinical case logging (Native Mode) |
+| Artifact Registry | `osteotwin` | Docker container images |
+| Cloud Run | `osteotwin-planning` | Planning Server (scale-to-zero) |
+| Cloud Run | `osteotwin-simulation` | Simulation Server (internal) |
+| Cloud Run | `osteotwin-dashboard` | React Dashboard (nginx) |
+| Service Account | `osteotwin-cloudrun` | Cloud Run → Secrets/GCS/Pub/Sub/Firestore |
 
 ## Phase Status
 - [x] Phase 0: Project scaffolding, schemas, server skeletons
 - [x] Phase 1: Rigid body collision, auth (JWT), LLM orchestrator, multi-agent debate, DICOM pipeline, Neo4j scaffold, HTMX web UI, Windows services
 - [x] Phase 2: TotalSegmentator, implant CAD library (20+), smart sizing, DICOM→mesh tested (2 fragments, 35K verts)
 - [x] Cloud infra: Pub/Sub, checkpoint bucket, dormant Spot VM (size=0), worker.py with checkpoint/failover
+- [x] Cloud Run migration: Dockerfiles, Artifact Registry, Cloud Build CI/CD, deploy.sh, IAM (SA → Secrets/GCS/Pub/Sub/Firestore)
 - [x] Phase 3: STL export for 3D printing (color-coded fragments + plates, K-wires excluded)
 - [x] Phase 4: E2E integration test (8/8 passed), live Claude tool-use verified
 - [x] React Command Center dashboard (Vite + React + Tailwind v4 + Lucide)
@@ -292,6 +323,7 @@ pytest tests/test_e2e_pipeline.py -v
 - [x] Phase 8: Bi-directional 3D UI Sync — coordinateMapper.ts (Three.js Y-up ↔ LPS Z-up), TransformControls on fragments, drag→SurgicalAction dispatch, sync-ui-action endpoint, Claude context injection
 - [x] Phase 9: Autonomous Catalog-to-CAD Pipeline — ManufacturerAlias (3-letter codes), ParametricImplantSpec, 6-strike QA loop (Gemini validates, Claude corrects), OpenSCAD generation, 6-way rendering, auto-export on approval
 - [x] Firestore Clinical Logging — SurgicalCaseLog schema (quantitative + qualitative), FirestoreFeedbackLogger (async, fire-and-forget), auto delta computation, post-op feedback, Terraform provisioning
+- [x] SQLite → Firestore migration — User/Case/Debate models moved to Firestore (free tier: 50K reads, 20K writes/day), SQLAlchemy/aiosqlite removed, in-memory fallback for local dev
 - [x] THUMS v7.1 Integration — LS-DYNA .k parser (2381 parts, 1975 materials, 840K nodes, 2.1M elements), thums_anatomical_map.json, VTK mesh export, SOFA material_configs.json, mass validation, 4 subjects (AF05/AF50/AM50/AM95), GCS backup, THUMSMaterialDB loader wired into soft-tissue engine
 - [x] Phase 9 CAD Pipeline fully wired — Gemini extraction, Claude SCAD generation, OpenSCAD 6-way render + Pillow stitch, Gemini QA validation (XML parsing), Claude auto-correction, OpenSCAD STL/3MF export
 - [x] C-arm Simulation — DRR engine, physical C-arm model (arc radius, throat depth, bed, patient, rails), collision detection (arc vs bed/patient/rails), feasibility map, OR scene 6-view rendering, Gemini validation pipeline

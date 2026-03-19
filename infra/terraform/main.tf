@@ -42,6 +42,9 @@ resource "google_project_service" "services" {
     "pubsub.googleapis.com",
     "compute.googleapis.com",
     "firestore.googleapis.com",
+    "run.googleapis.com",
+    "artifactregistry.googleapis.com",
+    "iam.googleapis.com",
   ])
   project = google_project.osteotwin.project_id
   service = each.value
@@ -336,7 +339,7 @@ resource "google_secret_manager_secret" "neo4j_password" {
 }
 
 # =============================================================================
-# Firestore: Clinical Case Logging (Native Mode)
+# Firestore: User Auth + Clinical Case Logging (Native Mode)
 # =============================================================================
 
 resource "google_firestore_database" "clinical_logs" {
@@ -349,6 +352,9 @@ resource "google_firestore_database" "clinical_logs" {
 
   depends_on = [google_project_service.services]
 }
+
+# Users collection: single-field indexes auto-created by Firestore for
+# username and status queries. No composite index needed.
 
 resource "google_firestore_index" "case_timestamp" {
   project    = google_project.osteotwin.project_id
@@ -382,4 +388,381 @@ resource "google_firestore_index" "surgeon_timestamp" {
   }
 
   depends_on = [google_firestore_database.clinical_logs]
+}
+
+# =============================================================================
+# Artifact Registry: Docker container images
+# =============================================================================
+
+resource "google_artifact_registry_repository" "osteotwin" {
+  location      = local.region
+  repository_id = "osteotwin"
+  format        = "DOCKER"
+  project       = google_project.osteotwin.project_id
+  description   = "OsteoTwin container images (planning, simulation, dashboard)"
+
+  cleanup_policies {
+    id     = "keep-recent"
+    action = "KEEP"
+    most_recent_versions {
+      keep_count = 10
+    }
+  }
+
+  depends_on = [google_project_service.services]
+}
+
+# =============================================================================
+# Cloud Run: Planning Server (scale-to-zero)
+# =============================================================================
+
+resource "google_cloud_run_v2_service" "planning" {
+  name     = "osteotwin-planning"
+  location = local.region
+  project  = google_project.osteotwin.project_id
+
+  template {
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 3
+    }
+
+    containers {
+      image = "${local.region}-docker.pkg.dev/${local.project_id}/osteotwin/planning-server:latest"
+
+      ports {
+        container_port = 8080
+      }
+
+      resources {
+        limits = {
+          cpu    = "2"
+          memory = "1Gi"
+        }
+      }
+
+      # Plain env vars
+      env {
+        name  = "PLAN_HOST"
+        value = "0.0.0.0"
+      }
+      env {
+        name  = "PLAN_PORT"
+        value = "8080"
+      }
+      env {
+        name  = "GCP_PROJECT_ID"
+        value = local.project_id
+      }
+
+      # Secrets from Secret Manager
+      env {
+        name = "ANTHROPIC_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.anthropic_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name = "GEMINI_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.gemini_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name = "JWT_SECRET_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.jwt_secret.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name = "SIM_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.sim_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name = "ADMIN_PASSWORD"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.admin_password.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name = "NEO4J_PASSWORD"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.neo4j_password.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      # SIMULATION_SERVER_URL is set after deploy via gcloud (circular dependency)
+    }
+
+    timeout = "300s"
+
+    service_account = google_service_account.cloud_run.email
+  }
+
+  depends_on = [
+    google_project_service.services,
+    google_artifact_registry_repository.osteotwin,
+  ]
+
+  lifecycle {
+    ignore_changes = [
+      template[0].containers[0].image,                   # managed by Cloud Build
+      template[0].containers[0].env,                     # SIMULATION_SERVER_URL set post-deploy
+    ]
+  }
+}
+
+# Public access for planning server (has its own JWT auth)
+resource "google_cloud_run_v2_service_iam_member" "planning_public" {
+  project  = google_project.osteotwin.project_id
+  location = local.region
+  name     = google_cloud_run_v2_service.planning.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+
+  depends_on = [google_cloud_run_v2_service.planning]
+}
+
+# =============================================================================
+# Cloud Run: Simulation Server (scale-to-zero, internal only)
+# =============================================================================
+
+resource "google_cloud_run_v2_service" "simulation" {
+  name     = "osteotwin-simulation"
+  location = local.region
+  project  = google_project.osteotwin.project_id
+
+  template {
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 3
+    }
+
+    containers {
+      image = "${local.region}-docker.pkg.dev/${local.project_id}/osteotwin/simulation-server:latest"
+
+      ports {
+        container_port = 8080
+      }
+
+      resources {
+        limits = {
+          cpu    = "4"
+          memory = "2Gi"
+        }
+      }
+
+      env {
+        name  = "SIM_HOST"
+        value = "0.0.0.0"
+      }
+      env {
+        name  = "SIM_PORT"
+        value = "8080"
+      }
+      env {
+        name  = "GCP_PROJECT_ID"
+        value = local.project_id
+      }
+      env {
+        name = "SIM_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.sim_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+    }
+
+    timeout = "300s"
+
+    service_account = google_service_account.cloud_run.email
+  }
+
+  depends_on = [
+    google_project_service.services,
+    google_artifact_registry_repository.osteotwin,
+  ]
+
+  lifecycle {
+    ignore_changes = [
+      template[0].containers[0].image,
+    ]
+  }
+}
+
+# Simulation server: only callable by planning server (service-to-service auth)
+resource "google_cloud_run_v2_service_iam_member" "simulation_invoker" {
+  project  = google_project.osteotwin.project_id
+  location = local.region
+  name     = google_cloud_run_v2_service.simulation.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.cloud_run.email}"
+
+  depends_on = [google_cloud_run_v2_service.simulation]
+}
+
+# =============================================================================
+# Cloud Run: Dashboard (static nginx, scale-to-zero)
+# =============================================================================
+
+resource "google_cloud_run_v2_service" "dashboard" {
+  name     = "osteotwin-dashboard"
+  location = local.region
+  project  = google_project.osteotwin.project_id
+
+  template {
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 2
+    }
+
+    containers {
+      image = "${local.region}-docker.pkg.dev/${local.project_id}/osteotwin/dashboard:latest"
+
+      ports {
+        container_port = 8080
+      }
+
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "256Mi"
+        }
+      }
+
+      # Proxy targets (set post-deploy by Cloud Build)
+      env {
+        name  = "PLANNING_API_URL"
+        value = "http://localhost:8200"
+      }
+      env {
+        name  = "SIMULATION_API_URL"
+        value = "http://localhost:8300"
+      }
+    }
+
+    timeout = "60s"
+
+    service_account = google_service_account.cloud_run.email
+  }
+
+  depends_on = [
+    google_project_service.services,
+    google_artifact_registry_repository.osteotwin,
+  ]
+
+  lifecycle {
+    ignore_changes = [
+      template[0].containers[0].image,
+      template[0].containers[0].env,
+    ]
+  }
+}
+
+# Public access for dashboard
+resource "google_cloud_run_v2_service_iam_member" "dashboard_public" {
+  project  = google_project.osteotwin.project_id
+  location = local.region
+  name     = google_cloud_run_v2_service.dashboard.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+
+  depends_on = [google_cloud_run_v2_service.dashboard]
+}
+
+# =============================================================================
+# IAM: Cloud Run Service Account
+# =============================================================================
+
+resource "google_service_account" "cloud_run" {
+  account_id   = "osteotwin-cloudrun"
+  display_name = "OsteoTwin Cloud Run Service Account"
+  project      = google_project.osteotwin.project_id
+
+  depends_on = [google_project_service.services]
+}
+
+# Cloud Run SA can read secrets
+resource "google_project_iam_member" "cloudrun_secret_accessor" {
+  project = google_project.osteotwin.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.cloud_run.email}"
+
+  depends_on = [google_service_account.cloud_run]
+}
+
+# Cloud Run SA can read/write GCS (mesh cache, DICOM, checkpoints)
+resource "google_project_iam_member" "cloudrun_storage" {
+  project = google_project.osteotwin.project_id
+  role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:${google_service_account.cloud_run.email}"
+
+  depends_on = [google_service_account.cloud_run]
+}
+
+# Cloud Run SA can publish to Pub/Sub (async simulation dispatch)
+resource "google_project_iam_member" "cloudrun_pubsub" {
+  project = google_project.osteotwin.project_id
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:${google_service_account.cloud_run.email}"
+
+  depends_on = [google_service_account.cloud_run]
+}
+
+# Cloud Run SA can read/write Firestore (clinical logs)
+resource "google_project_iam_member" "cloudrun_firestore" {
+  project = google_project.osteotwin.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.cloud_run.email}"
+
+  depends_on = [google_service_account.cloud_run]
+}
+
+# Cloud Build SA can push to Artifact Registry
+resource "google_project_iam_member" "cloudbuild_ar_writer" {
+  project = google_project.osteotwin.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${google_project.osteotwin.number}@cloudbuild.gserviceaccount.com"
+
+  depends_on = [google_project_service.services]
+}
+
+# Cloud Build SA can deploy Cloud Run services
+resource "google_project_iam_member" "cloudbuild_run_admin" {
+  project = google_project.osteotwin.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${google_project.osteotwin.number}@cloudbuild.gserviceaccount.com"
+
+  depends_on = [google_project_service.services]
+}
+
+# Cloud Build SA can act as the Cloud Run service account
+resource "google_service_account_iam_member" "cloudbuild_act_as" {
+  service_account_id = google_service_account.cloud_run.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_project.osteotwin.number}@cloudbuild.gserviceaccount.com"
+
+  depends_on = [google_service_account.cloud_run]
 }
