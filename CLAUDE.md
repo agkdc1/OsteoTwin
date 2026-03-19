@@ -192,17 +192,18 @@ See memory file `project_batch_audit_todo.md` for full implementation checklist.
 - **GCS prefix**: `osteotwin_audit/jobs/` in shared bucket
 - **Cost**: 50% discount vs realtime, 65536 max_output_tokens
 
-### Cloud Architecture (Cloud Run)
-All services deployed to Cloud Run (scale-to-zero) in `asia-northeast1`:
-- **Dashboard** → `osteotwin-dashboard` → `https://osteotwin.<DOMAIN>` (public)
-- **Planning Server** → `osteotwin-planning` → `https://plan.osteotwin.<DOMAIN>` (public, JWT auth, 1Gi/2CPU)
-- **Simulation Server** → `osteotwin-simulation` → `https://sim.osteotwin.<DOMAIN>` (internal only, API key auth, 2Gi/4CPU)
+### Cloud Architecture (Cloud Run + Cloudflare Zero Trust)
+All services in `asia-northeast1`, gated by Cloudflare Access (Google login, owner-only):
+- **Dashboard** → GCS bucket `osteotwin-37f03c-dashboard` → `https://osteotwin.<DOMAIN>`
+- **Planning Server** → Cloud Run `osteotwin-planning` → `https://plan-osteotwin.<DOMAIN>` (1Gi/2CPU)
+- **Simulation Server** → Cloud Run `osteotwin-simulation` → `https://sim-osteotwin.<DOMAIN>` (2Gi/4CPU)
 - **GPU Workers** → Spot VM MIG (Pub/Sub pull, dormant at size=0)
 - **Container Registry** → Artifact Registry (`asia-northeast1-docker.pkg.dev`)
 - **CI/CD** → Cloud Build (`cloudbuild.yaml`, auto-wires inter-service URLs)
+- **Auth** → Cloudflare Access (Google login, owner-only policy) — $0 for ≤50 users
+- **DNS** → Cloudflare proxied CNAME → Cloud Run / GCS (Cloudflare-managed TLS)
 - **Secrets** → GCP Secret Manager (injected into Cloud Run at deploy)
-- **DNS** → Cloudflare CNAME → `ghs.googlehosted.com` (Google-managed TLS)
-- **Actual URLs** stored in Secret Manager (`planning-server-url`, `simulation-server-url`, `dashboard-url`) — never in git
+- **Actual URLs** stored in Secret Manager — never in git
 
 ## Key Endpoints
 
@@ -299,14 +300,15 @@ pytest tests/test_e2e_pipeline.py -v
 | Spot MIG | `osteotwin-sim-workers` | GPU workers (size=0) |
 | Firestore | `(default)` | User auth + clinical case logging (Native Mode) |
 | Artifact Registry | `osteotwin` | Docker container images |
-| Cloud Run | `osteotwin-planning` | Planning Server → `plan.osteotwin.<DOMAIN>` |
-| Cloud Run | `osteotwin-simulation` | Simulation Server → `sim.osteotwin.<DOMAIN>` |
-| Cloud Run | `osteotwin-dashboard` | Dashboard → `osteotwin.<DOMAIN>` |
+| Cloud Run | `osteotwin-planning` | Planning Server → `plan-osteotwin.<DOMAIN>` |
+| Cloud Run | `osteotwin-simulation` | Simulation Server → `sim-osteotwin.<DOMAIN>` |
+| GCS bucket | `osteotwin-37f03c-dashboard` | Dashboard static files → `osteotwin.<DOMAIN>` |
 | Service Account | `osteotwin-cloudrun` | Cloud Run → Secrets/GCS/Pub/Sub/Firestore |
 | Secret | `planning-server-url` | Actual Cloud Run URL (never in git) |
 | Secret | `simulation-server-url` | Actual Cloud Run URL (never in git) |
 | Secret | `dashboard-url` | Actual Cloud Run URL (never in git) |
-| Secret | `cloudflare-api-token` | Cloudflare DNS management token |
+| Secret | `cloudflare-api-token` | Cloudflare API token (DNS, tunnel, Access) |
+| Secret | `cloudflare-rule-token` | Cloudflare transform rule token |
 
 ## Phase Status
 - [x] Phase 0: Project scaffolding, schemas, server skeletons
