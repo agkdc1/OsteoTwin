@@ -194,13 +194,15 @@ See memory file `project_batch_audit_todo.md` for full implementation checklist.
 
 ### Cloud Architecture (Cloud Run)
 All services deployed to Cloud Run (scale-to-zero) in `asia-northeast1`:
-- **Planning Server** → `osteotwin-planning` (public, JWT auth, 1Gi/2CPU)
-- **Simulation Server** → `osteotwin-simulation` (internal only, API key auth, 2Gi/4CPU)
-- **Dashboard** → `osteotwin-dashboard` (public, nginx reverse proxy to backends)
+- **Dashboard** → `osteotwin-dashboard` → `https://osteotwin.<DOMAIN>` (public)
+- **Planning Server** → `osteotwin-planning` → `https://plan.osteotwin.<DOMAIN>` (public, JWT auth, 1Gi/2CPU)
+- **Simulation Server** → `osteotwin-simulation` → `https://sim.osteotwin.<DOMAIN>` (internal only, API key auth, 2Gi/4CPU)
 - **GPU Workers** → Spot VM MIG (Pub/Sub pull, dormant at size=0)
 - **Container Registry** → Artifact Registry (`asia-northeast1-docker.pkg.dev`)
 - **CI/CD** → Cloud Build (`cloudbuild.yaml`, auto-wires inter-service URLs)
 - **Secrets** → GCP Secret Manager (injected into Cloud Run at deploy)
+- **DNS** → Cloudflare CNAME → `ghs.googlehosted.com` (Google-managed TLS)
+- **Actual URLs** stored in Secret Manager (`planning-server-url`, `simulation-server-url`, `dashboard-url`) — never in git
 
 ## Key Endpoints
 
@@ -297,10 +299,14 @@ pytest tests/test_e2e_pipeline.py -v
 | Spot MIG | `osteotwin-sim-workers` | GPU workers (size=0) |
 | Firestore | `(default)` | User auth + clinical case logging (Native Mode) |
 | Artifact Registry | `osteotwin` | Docker container images |
-| Cloud Run | `osteotwin-planning` | Planning Server (scale-to-zero) |
-| Cloud Run | `osteotwin-simulation` | Simulation Server (internal) |
-| Cloud Run | `osteotwin-dashboard` | React Dashboard (nginx) |
+| Cloud Run | `osteotwin-planning` | Planning Server → `plan.osteotwin.<DOMAIN>` |
+| Cloud Run | `osteotwin-simulation` | Simulation Server → `sim.osteotwin.<DOMAIN>` |
+| Cloud Run | `osteotwin-dashboard` | Dashboard → `osteotwin.<DOMAIN>` |
 | Service Account | `osteotwin-cloudrun` | Cloud Run → Secrets/GCS/Pub/Sub/Firestore |
+| Secret | `planning-server-url` | Actual Cloud Run URL (never in git) |
+| Secret | `simulation-server-url` | Actual Cloud Run URL (never in git) |
+| Secret | `dashboard-url` | Actual Cloud Run URL (never in git) |
+| Secret | `cloudflare-api-token` | Cloudflare DNS management token |
 
 ## Phase Status
 - [x] Phase 0: Project scaffolding, schemas, server skeletons
