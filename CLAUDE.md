@@ -151,6 +151,32 @@ Left/right sign flips are handled automatically in `/shared/kinematics.py`:
 - GCP Secret Manager for production (see `system/fetch_secrets.sh`)
 - Admin password is random, stored in Secret Manager (`admin-password`)
 
+## Cross-Project Notes (from ROBOT4KID, 2026-03-19)
+
+### Gemini 3.x API — Critical Findings
+- **Model IDs**: `gemini-3.1-pro-preview`, `gemini-3-pro-preview`, `gemini-3-flash-preview`
+- **Deep Think**: NOT a separate model — it's `thinking_level="HIGH"` parameter on any 3.x model
+  ```python
+  config = genai.types.GenerateContentConfig(
+      thinking_config=genai.types.ThinkingConfig(thinking_level="HIGH"),
+  )
+  ```
+- **Vertex AI location**: Use `"global"` (3.x models 404 on `us-central1`)
+- **Python version**: Use 3.13 (NOT 3.14) — `google-cloud-storage` SDK breaks on 3.14
+- **AI Studio vs Vertex AI**: 3.x Pro models have `limit: 0` on free tier batch quota. Use Vertex AI (GCP billing) for production.
+
+### TODO: Migrate Audit/Debate to Batch Prediction
+See memory file `project_batch_audit_todo.md` for full implementation checklist.
+- **Why**: Real-time `generate_content()` truncates long outputs. Batch writes full JSONL to GCS.
+- **Architecture**: prompt → JSONL → GCS → `client.batches.create()` → poll → download results
+- **Reference impl**: `ROBOT4KID/planning_server/app/pipeline/batch_audit.py`
+- **GCS prefix**: `osteotwin_audit/jobs/` in shared bucket
+- **Cost**: 50% discount vs realtime, 65536 max_output_tokens
+
+### Cloud Migration Pattern (shared with ROBOT4KID)
+Both projects migrating to: Cloud Run (scale-to-zero) + Firestore (free tier) + Pub/Sub + Spot VM + GCS.
+See ROBOT4KID `infra/terraform/` for reference Terraform configs.
+
 ## Key Endpoints
 
 ### Planning Server (:8200)
