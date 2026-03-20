@@ -28,19 +28,25 @@ function Layout({ children }: { children: React.ReactNode }) {
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(!getToken());
+  const [retries, setRetries] = useState(0);
 
   useEffect(() => {
-    if (!getToken()) {
-      // Try Cloudflare Access auto-login before redirecting
+    if (!getToken() && retries < 3) {
       cfLogin().then((ok) => {
-        if (!ok) setChecking(false);
-        else window.location.reload();
+        if (ok) {
+          window.location.reload();
+        } else {
+          // Retry after short delay (CF Access might still be setting headers)
+          setTimeout(() => setRetries(r => r + 1), 1000);
+        }
       });
+    } else if (!getToken()) {
+      setChecking(false);
     }
-  }, []);
+  }, [retries]);
 
   if (getToken()) return <Layout>{children}</Layout>;
-  if (checking) return <div className="flex h-screen items-center justify-center">Authenticating...</div>;
+  if (checking) return <div className="flex h-screen items-center justify-center" style={{ color: 'var(--text-primary)' }}>Authenticating...</div>;
   return <Navigate to="/login" replace />;
 }
 
