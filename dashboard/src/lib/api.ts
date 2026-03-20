@@ -61,6 +61,19 @@ export async function login(username: string, password: string) {
   return data;
 }
 
+/** Auto-login via Cloudflare Access JWT (set by CF Access gate). */
+export async function cfLogin(): Promise<boolean> {
+  try {
+    const resp = await fetch('/auth/cf-login', { method: 'POST' });
+    if (!resp.ok) return false;
+    const data = await resp.json();
+    setToken(data.access_token, 'cf-user');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // --- Health ---
 export async function planHealth() {
   const resp = await fetch('/health');

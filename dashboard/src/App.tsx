@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Sidebar } from './components/Sidebar';
@@ -9,7 +10,7 @@ import { Viewer } from './pages/Viewer';
 import { VoiceConsole } from './pages/VoiceConsole';
 import { PrinterAdmin } from './pages/PrinterAdmin';
 import { AuditReport } from './pages/AuditReport';
-import { getToken } from './lib/api';
+import { getToken, cfLogin } from './lib/api';
 import { Login } from './pages/Login';
 
 const queryClient = new QueryClient({
@@ -26,8 +27,21 @@ function Layout({ children }: { children: React.ReactNode }) {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  if (!getToken()) return <Navigate to="/login" replace />;
-  return <Layout>{children}</Layout>;
+  const [checking, setChecking] = useState(!getToken());
+
+  useEffect(() => {
+    if (!getToken()) {
+      // Try Cloudflare Access auto-login before redirecting
+      cfLogin().then((ok) => {
+        if (!ok) setChecking(false);
+        else window.location.reload();
+      });
+    }
+  }, []);
+
+  if (getToken()) return <Layout>{children}</Layout>;
+  if (checking) return <div className="flex h-screen items-center justify-center">Authenticating...</div>;
+  return <Navigate to="/login" replace />;
 }
 
 export default function App() {
