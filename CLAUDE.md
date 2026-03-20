@@ -194,14 +194,17 @@ See memory file `project_batch_audit_todo.md` for full implementation checklist.
 
 ### Cloud Architecture (Cloud Run + Cloudflare Zero Trust)
 All services in `asia-northeast1`, gated by Cloudflare Access (Google login, owner-only):
-- **Dashboard** → GCS bucket `osteotwin-37f03c-dashboard` → `https://osteotwin.<DOMAIN>`
+- **Dashboard** → Cloud Run `osteotwin-dashboard` (nginx static) → `https://osteotwin.<DOMAIN>`
 - **Planning Server** → Cloud Run `osteotwin-planning` → `https://plan-osteotwin.<DOMAIN>` (1Gi/2CPU)
 - **Simulation Server** → Cloud Run `osteotwin-simulation` → `https://sim-osteotwin.<DOMAIN>` (2Gi/4CPU)
 - **GPU Workers** → Spot VM MIG (Pub/Sub pull, dormant at size=0)
 - **Container Registry** → Artifact Registry (`asia-northeast1-docker.pkg.dev`)
 - **CI/CD** → Cloud Build (`cloudbuild.yaml`, auto-wires inter-service URLs)
 - **Auth** → Cloudflare Access (Google login, owner-only policy) — $0 for ≤50 users
-- **DNS** → Cloudflare proxied CNAME → Cloud Run / GCS (Cloudflare-managed TLS)
+- **Routing** → Cloudflare Worker `osteotwin-router` (routes API paths to planning server, sim paths to simulation server)
+- **Origin Guard** → Shared secret `X-CF-Origin-Secret` header (Worker → Cloud Run); direct `.run.app` access returns 403
+- **Auto-login** → `POST /auth/cf-login` reads `Cf-Access-Jwt-Assertion` header, auto-creates approved user in Firestore
+- **DNS** → Cloudflare proxied CNAME → Cloud Run (Cloudflare-managed TLS, flat subdomains for free Universal SSL)
 - **Secrets** → GCP Secret Manager (injected into Cloud Run at deploy)
 - **Actual URLs** stored in Secret Manager — never in git
 
@@ -307,8 +310,10 @@ pytest tests/test_e2e_pipeline.py -v
 | Secret | `planning-server-url` | Actual Cloud Run URL (never in git) |
 | Secret | `simulation-server-url` | Actual Cloud Run URL (never in git) |
 | Secret | `dashboard-url` | Actual Cloud Run URL (never in git) |
-| Secret | `cloudflare-api-token` | Cloudflare API token (DNS, tunnel, Access) |
+| Secret | `cloudflare-api-token` | Cloudflare API token (DNS, Workers, Access) |
 | Secret | `cloudflare-rule-token` | Cloudflare transform rule token |
+| Secret | `cloudflare-origin-secret` | Shared secret: Worker → Cloud Run origin guard |
+| Secret | `iap-allowed-user` | Owner email for access control |
 
 ## Phase Status
 - [x] Phase 0: Project scaffolding, schemas, server skeletons

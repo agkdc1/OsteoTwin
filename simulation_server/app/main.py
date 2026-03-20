@@ -8,11 +8,13 @@ All physics results are computed here — the LLM never guesses physics.
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import config
 from .auth import verify_api_key
@@ -107,6 +109,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+_CF_ORIGIN_SECRET = os.environ.get("CF_ORIGIN_SECRET", "")
+
+
+class CloudflareOriginGuard(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if _CF_ORIGIN_SECRET and request.url.path != "/health":
+            if request.headers.get("X-CF-Origin-Secret") != _CF_ORIGIN_SECRET:
+                return Response("Forbidden — access via Cloudflare only", status_code=403)
+        return await call_next(request)
+
+
+if _CF_ORIGIN_SECRET:
+    app.add_middleware(CloudflareOriginGuard)
 
 # Routers
 app.include_router(dicom_router)

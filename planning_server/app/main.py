@@ -7,13 +7,15 @@ and the Multi-LLM Orchestrator (Claude primary, Gemini secondary).
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import config
 from .database import init_db, user_store
@@ -77,6 +79,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Cloudflare origin secret validation — rejects direct access bypassing Cloudflare
+_CF_ORIGIN_SECRET = os.environ.get("CF_ORIGIN_SECRET", "")
+
+
+class CloudflareOriginGuard(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if _CF_ORIGIN_SECRET and request.url.path != "/health":
+            if request.headers.get("X-CF-Origin-Secret") != _CF_ORIGIN_SECRET:
+                return Response("Forbidden — access via Cloudflare only", status_code=403)
+        return await call_next(request)
+
+
+if _CF_ORIGIN_SECRET:
+    app.add_middleware(CloudflareOriginGuard)
 
 # Static files
 STATIC_DIR = Path(__file__).parent.parent / "static"
