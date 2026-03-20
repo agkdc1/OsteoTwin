@@ -5,11 +5,11 @@ WORKDIR /app
 
 # Install deps (cache layer)
 COPY dashboard/package.json dashboard/package-lock.json* /app/
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source and build
 COPY dashboard/ /app/
-RUN npm run build
+RUN ./node_modules/.bin/vite build
 
 # --- Production stage: nginx serves static files ---
 FROM nginx:alpine
@@ -27,5 +27,8 @@ EXPOSE 8080
 ENV PLANNING_API_URL=http://localhost:8200
 ENV SIMULATION_API_URL=http://localhost:8300
 
-# nginx docker image auto-runs envsubst on /etc/nginx/templates/*.template → /etc/nginx/conf.d/
-CMD ["nginx", "-g", "daemon off;"]
+# Tell nginx envsubst to ONLY replace these two vars (not $uri, $host, etc)
+ENV NGINX_ENVSUBST_TEMPLATE_SUFFIX=.template
+ENV NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx/conf.d
+
+CMD ["/bin/sh", "-c", "envsubst '${PLANNING_API_URL} ${SIMULATION_API_URL}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
